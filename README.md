@@ -36,14 +36,14 @@ pip install PyQt6 ebooklib beautifulsoup4 chardet opencc-python-reimplemented lo
 ## 使用
 
 ```bash
-cd new/
+cd txtpress/
 python main.py
 ```
 
 ## 项目结构
 
 ```
-new/
+txtpress/
 ├── main.py                      # 程序入口
 ├── window.py                    # 主窗口 UI
 ├── services.py                  # 核心转换逻辑
