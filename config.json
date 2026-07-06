@@ -1,0 +1,7 @@
+{
+  "txt_encoding": "自动检测",
+  "out_encoding": "utf-8",
+  "chapter_sep": "（无）",
+  "chapter_regex": "^\\s*([第卷][0123456789一二三四五六七八九十零〇百千两]*[章回部节集卷].*)\\s*",
+  "fanjian_enabled": false
+}
