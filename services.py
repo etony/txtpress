@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import re
+import uuid
 import datetime
 import shutil
 from pathlib import Path
@@ -502,6 +503,26 @@ class Epub2Txt:
 
     # ---- 元信息修改 ----
 
+    def _fix_toc_uids(self):
+        """
+        修复 TOC 中缺失 uid 的 Link 对象。
+
+        某些外部工具生成的 EPUB，其目录项的 uid 为 None，
+        ebooklib 写回时会将 uid 作为 XML 属性写入，不允许 None。
+        此方法递归遍历 TOC，为缺 uid 的 Link 分配唯一 ID。
+        """
+        def _assign(item):
+            if isinstance(item, epub.Link) and not item.uid:
+                item.uid = f'navpoint-{uuid.uuid4().hex[:8]}'
+            elif isinstance(item, tuple):
+                link, children = item
+                _assign(link)
+                for child in children:
+                    _assign(child)
+
+        for item in self._book.toc:
+            _assign(item)
+
     def modi(self, info: BookInfo, filepath: Optional[str] = None) -> None:
         """
         修改 EPUB 元数据并保存。
@@ -513,6 +534,7 @@ class Epub2Txt:
             info:     新的元数据
             filepath: 保存路径（不传则覆盖原文件）
         """
+        self._fix_toc_uids()
         self._book.set_unique_metadata('DC', 'title', info.title)
         self._book.set_unique_metadata('DC', 'date', info.date)
         self._book.set_unique_metadata('DC', 'creator', info.creator)
@@ -520,7 +542,20 @@ class Epub2Txt:
         desc = info.description or _DEFAULT_DESC
         self._book.set_unique_metadata('DC', 'description', desc)
         if info.cover is not None:
-            self._book.set_cover('cover.jpeg', info.cover)
+            # 直接替换已有封面图片内容，而非调用 set_cover()。
+            # set_cover() 会创建 EpubCoverHtml 页面，
+            # 某些 EPUB 中该页面内容为空，导致写回时 lxml 报 Document is empty。
+            replaced = False
+            for item in self._book.get_items():
+                if item.get_type() in (ebooklib.ITEM_IMAGE, ebooklib.ITEM_COVER):
+                    name = item.get_name()
+                    cid = getattr(item, 'id', '')
+                    if 'cover' in name.lower() or 'cover' in str(cid).lower():
+                        item.set_content(info.cover)
+                        replaced = True
+                        break
+            if not replaced:
+                self._book.set_cover('cover.jpeg', info.cover)
         epub.write_epub(filepath or self.epub_path, self._book, {})
 
     # ---- 提取封面图片到磁盘 ----

@@ -1,0 +1,7 @@
+PyQt6
+ebooklib
+beautifulsoup4
+chardet
+opencc-python-reimplemented
+loguru
+mobi
