@@ -5,8 +5,24 @@ TxtPress — 电子书格式转换工具。主窗口，Tab 布局，绑定所有
 这个文件是程序的"骨架"——负责所有 UI 控件的创建、布局和事件绑定。
 代码量最大，但逻辑清晰：分为 3 个 Tab，每个 Tab 有"设置"和"操作"两部分。
 
+架构设计：
+  MainWindow (QMainWindow)
+    ├── QTabWidget
+    │   ├── Tab 0: TXT → EPUB  (生成电子书)
+    │   ├── Tab 1: EPUB → TXT  (提取文本)
+    │   └── Tab 2: MOBI → TXT  (额外的格式支持)
+    └── 状态栏（QStatusBar）
+        ├── 进度条（QProgressBar，默认隐藏）
+        └── 取消按钮（默认隐藏）
+
+交互模式：
+  1. 用户填写/选择文件 → 点击转换 → 创建业务对象（Txt2Epub 等）
+  2. 通过 _run_worker 在后台线程执行耗时操作
+  3. 转换过程中通过信号实时更新进度条和状态栏
+  4. 完成后弹窗询问是否打开输出目录
+
 文件结构：
-  1. 辅助控件（_ClickableLabel）
+  1. 辅助控件（_ClickableLabel, _DropLineEdit）
   2. MainWindow 主体
      - __init__:      窗口初始化、状态变量、进度条
      - _setup_tab1:   TXT → EPUB 的 UI 控件
@@ -23,44 +39,95 @@ from __future__ import annotations
 import os
 import re
 import sys
+import subprocess
 import datetime
 
 from loguru import logger
 import chardet
 
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
     QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
-    QFileDialog, QMessageBox, QApplication,
+    QFileDialog, QMessageBox,
 )
 from PyQt6.QtGui import QIcon, QPixmap, QImage
+from pathlib import Path
+from opencc import OpenCC
 
 from models import AppConfig, BookInfo
-from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt
+from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX, _DEFAULT_DESC
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
 
 
 # ---- 资源路径 ----
 # _BASE_DIR: 当前文件所在目录，用于定位资源文件和 config.json
+# 注意：__file__ 在打包成 exe 后可能是相对路径或临时路径，
+# os.path.abspath(__file__) 确保拿到的是规范的绝对路径。
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_RES_DIR = os.path.join(_BASE_DIR, 'resources', 'images')  # 图片资源目录
-_CONFIG_PATH = os.path.join(_BASE_DIR, 'config.json')       # 配置文件路径
+_RES_DIR = os.path.join(_BASE_DIR, 'resources', 'images')
+_CONFIG_PATH = os.path.join(_BASE_DIR, 'config.json')
+_ENCODE_DETECT_SIZE = 4096  # 编码检测时读取的文件前 4096 字节
+_MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能是误输入）
 
 
 # ---- 辅助控件：可点击标签 ----
 # QLabel 默认没有 clicked 信号，这个子类加了一个。
 # 在 tab1 和 tab2 中，点击封面图片可以更换封面。
+# 为什么不直接用 QPushButton？因为 QPushButton 不能显示图片缩放效果，
+# 而 QLabel 设置 setScaledContents(True) 可以自动缩放图片到合适大小。
 
 class _ClickableLabel(QLabel):
-    """支持 clicked 信号的 QLabel。"""
+    """支持 clicked 信号的 QLabel。
+
+    用法：
+        label = _ClickableLabel()
+        label.clicked.connect(do_something)
+
+    原理：
+    重写 mousePressEvent（鼠标按下事件），
+    在事件处理器中发射自定义的 clicked 信号。
+    """
     clicked = pyqtSignal()
 
     def mousePressEvent(self, event):
-        """重写鼠标点击事件，发射 clicked 信号。"""
+        """重写鼠标点击事件，发射 clicked 信号。
+
+        注意：使用 mousePressEvent（按下时触发）而不是 mouseReleaseEvent（释放时触发），
+        因为前者响应更快，用户体验更好。
+        """
         self.clicked.emit()
+
+
+class _DropLineEdit(QLineEdit):
+    """支持拖放文件的 QLineEdit，通过构造参数指定接受的扩展名。
+
+    用法：
+        le = _DropLineEdit('.txt')  # 只接受 .txt 文件
+
+    拖放检测流程：
+    dragEnterEvent: 检查拖入内容是否包含文件 URL，且是否符合扩展名要求
+    dropEvent:      如果通过检查，把文件路径填入文本框
+    """
+    def __init__(self, ext: str, parent=None):
+        super().__init__(parent)
+        self._ext = ext
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        """拖入事件：检查文件扩展名是否符合要求。"""
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if len(urls) == 1 and urls[0].toLocalFile().lower().endswith(self._ext):
+                event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        """放下事件：将文件路径填入文本框。"""
+        urls = event.mimeData().urls()
+        if urls:
+            self.setText(urls[0].toLocalFile())
 
 
 # =====================================================================
@@ -78,6 +145,17 @@ class MainWindow(QMainWindow):
 
     每个 Tab 包含若干 QGroupBox 区域，通过垂直/水平布局排列。
     耗时操作通过 ProgressWorker 在后台线程执行，避免界面卡顿。
+
+    QMainWindow 自带了：
+    - setCentralWidget()  中央控件（我们放 QTabWidget）
+    - statusBar()         状态栏（我们放进度条和取消按钮）
+    - closeEvent()        窗口关闭事件（我们保存配置）
+
+    设计决策：
+    - 状态变量（_txt_cover, _epub_cover_path 等）在 __init__ 中集中声明，
+      方便维护者快速了解窗口有哪些跨方法共享的状态。
+    - UI 构建拆分为 _setup_tab1/2/3 方法，每个方法不超过 80 行。
+    - 槽函数命名 _on_xxx，一目了然是事件处理器。
     """
 
     def __init__(self):
@@ -101,6 +179,8 @@ class MainWindow(QMainWindow):
 
         # ---- 中央控件 ----
         # 整个窗口分为：Tab 标签页 + 底部状态栏
+        # QMainWindow 的布局是固定的：中央区域 + 菜单栏 + 状态栏
+        # 我们创建一个 QWidget 作为中央控件，在里面放 QTabWidget
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
@@ -116,12 +196,20 @@ class MainWindow(QMainWindow):
         self._setup_tab3()   # MOBI → TXT
 
         # ---- 状态栏 ----
-        # 状态栏右下角固定显示进度条（默认隐藏，转换时显示）
+        # 状态栏右下角固定显示进度条和取消按钮（默认隐藏，转换时显示）
+        # addPermanentWidget 将控件放在状态栏右侧（不会被临时消息顶走）
         self._progress_bar = QProgressBar()
         self._progress_bar.setVisible(False)
         self._progress_bar.setFixedWidth(200)
         self._progress_bar.setFixedHeight(14)
         self.statusBar().addPermanentWidget(self._progress_bar)
+        self._cancel_btn = QPushButton('取消')
+        self._cancel_btn.setObjectName('btn_reset')
+        self._cancel_btn.setVisible(False)
+        self._cancel_btn.setFixedWidth(50)
+        self._cancel_btn.setFixedHeight(22)
+        self._cancel_btn.clicked.connect(self._on_cancel_clicked)
+        self.statusBar().addPermanentWidget(self._cancel_btn)
         self.statusBar().showMessage('就绪')
 
         # ---- 快捷键 ----
@@ -145,6 +233,11 @@ class MainWindow(QMainWindow):
           书籍信息  → 书名 / 作者 / 贡献者 / 日期 / 描述 / 封面
           高级选项  → 文件编码 + 章节正则
           操作      → 目录预览 / 重置 / 开始转换 / →MOBI
+
+        布局思路：
+        - 每个区域用一个 QGroupBox 包裹（带标题边框的分组框）
+        - 组内用 QVBoxLayout 垂直排列，行内用 QHBoxLayout 水平排列
+        - setSpacing / setContentsMargins 控制间距，让界面不拥挤
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -157,30 +250,16 @@ class MainWindow(QMainWindow):
         gl = QVBoxLayout(grp)
         gl.setSpacing(8)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('TXT 文件:'))
-        self._le_txt = QLineEdit()
+        self._le_txt = _DropLineEdit('.txt')
         self._le_txt.setPlaceholderText('选择 TXT 源文件…')
-        # 支持从文件管理器直接拖放文件到输入框
-        self._le_txt.setAcceptDrops(True)
-        self._le_txt.dragEnterEvent = lambda e: self._line_drag_enter(e, '.txt')
-        self._le_txt.dropEvent = lambda e: self._line_drop(e, self._le_txt)
-        h.addWidget(self._le_txt)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_txt)
-        h.addWidget(btn)
+        h = self._create_file_row('TXT 文件:', self._le_txt,
+                                  self._on_browse_txt)
         gl.addLayout(h)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('EPUB 保存:'))
         self._le_epub = QLineEdit()
         self._le_epub.setPlaceholderText('自动生成或手动选择…')
-        h.addWidget(self._le_epub)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_epub)
-        h.addWidget(btn)
+        h = self._create_file_row('EPUB 保存:', self._le_epub,
+                                  self._on_browse_epub)
         gl.addLayout(h)
         layout.addWidget(grp)
 
@@ -223,10 +302,12 @@ class MainWindow(QMainWindow):
         gl.addLayout(h)
 
         # 第四行：封面图片 + 选择按钮
+        # 注意：tab1 和 tab2 各有一个封面标签，但 objectName 都叫 'cover_label'，
+        # 这样 QSS 样式可以同时作用于两个封面标签。
         h = QHBoxLayout()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
-        self._cover_label.setFixedSize(100, 140)
+        self._cover_label.setFixedSize(100, 140)  # 封面比例约 5:7，接近真实书封面
         self._cover_label.setScaledContents(True)  # 图片自动缩放填满标签
         self._cover_label.setPixmap(QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
         self._cover_label.clicked.connect(self._on_choose_cover)
@@ -242,6 +323,8 @@ class MainWindow(QMainWindow):
 
         # ---- 高级选项 ----
         # 编码和正则表达式，普通用户一般不需要修改
+        # 用 QPlainTextEdit（多行输入）而不是 QLineEdit 来放正则，
+        # 因为复杂的正则需要换行查看和编辑。
         grp = QGroupBox('高级选项')
         gl = QVBoxLayout(grp)
         gl.setSpacing(8)
@@ -257,13 +340,15 @@ class MainWindow(QMainWindow):
         self._te_reg = QPlainTextEdit()
         self._te_reg.setFixedHeight(60)
         self._te_reg.setPlaceholderText('自定义章节匹配正则…')
-        self._te_reg.setPlainText(self._config.chapter_regex)
+        self._te_reg.setPlainText(
+            self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
         h.addWidget(self._te_reg)
         gl.addLayout(h)
         layout.addWidget(grp)
 
         # ---- 操作 ----
         # 底部按钮区域：辅助功能在左，主要操作在右
+        # 用 addStretch() 把按钮推到两边
         grp = QGroupBox('操作')
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
@@ -299,10 +384,6 @@ class MainWindow(QMainWindow):
 
         self._tabs.addTab(tab, 'TXT → EPUB')
 
-        # 记录 tab1 中的可聚焦控件，供快捷键使用
-        self._tab1_focus = [self._le_txt, self._le_epub, self._le_title,
-                            self._le_author, self._cb_encode, self._te_reg]
-
     # ================================================================
     # Tab 2: EPUB → TXT
     # ================================================================
@@ -312,6 +393,12 @@ class MainWindow(QMainWindow):
         构建 Tab 2 的 UI 控件。
 
         相比 Tab 1，增加了"繁简转换"选项和多种输出模式。
+        布局结构与 Tab 1 类似：源文件 → 书籍信息 → 选项 → 操作。
+
+        两个 Tab 的"书籍信息"区域的 UI 几乎相同但数据不共享：
+        - tab1 的书籍信息用于创建新的 EPUB
+        - tab2 的书籍信息从已有 EPUB 读取，并可写回
+        之所以不共用，是为了避免用户在一个 tab 输入的数据污染另一个 tab。
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -323,29 +410,16 @@ class MainWindow(QMainWindow):
         gl = QVBoxLayout(grp)
         gl.setSpacing(8)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('EPUB 文件:'))
-        self._le_in_epub = QLineEdit()
+        self._le_in_epub = _DropLineEdit('.epub')
         self._le_in_epub.setPlaceholderText('选择 EPUB 源文件…')
-        self._le_in_epub.setAcceptDrops(True)
-        self._le_in_epub.dragEnterEvent = lambda e: self._line_drag_enter(e, '.epub')
-        self._le_in_epub.dropEvent = lambda e: self._line_drop(e, self._le_in_epub)
-        h.addWidget(self._le_in_epub)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_in_epub)
-        h.addWidget(btn)
+        h = self._create_file_row('EPUB 文件:', self._le_in_epub,
+                                  self._on_browse_in_epub)
         gl.addLayout(h)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('TXT 保存:'))
         self._le_out_txt = QLineEdit()
         self._le_out_txt.setPlaceholderText('自动生成或手动选择…')
-        h.addWidget(self._le_out_txt)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_out_txt)
-        h.addWidget(btn)
+        h = self._create_file_row('TXT 保存:', self._le_out_txt,
+                                  self._on_browse_out_txt)
         gl.addLayout(h)
         layout.addWidget(grp)
 
@@ -380,6 +454,7 @@ class MainWindow(QMainWindow):
         h.addWidget(self._le_book_desc)
         gl.addLayout(h)
 
+        # 封面 + 操作按钮区域
         h = QHBoxLayout()
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
@@ -420,6 +495,8 @@ class MainWindow(QMainWindow):
         gl.addWidget(QLabel('章节分隔:'))
         self._cb_sep = QComboBox()
         # \\n 在显示时为 "\n"，用户选择后被替换成真正的换行符
+        # 这里用双反斜杠是因为在 Python 字符串中 \\n 就是 "\n"（两个字符）
+        # Qt 会在 ComboBox 中显示 "\n"，触发编码时替换为 \n（一个换行符）
         self._cb_sep.addItems(['（无）', '\\n', '\\n\\n', '\\n---\\n'])
         gl.addWidget(self._cb_sep)
 
@@ -474,6 +551,7 @@ class MainWindow(QMainWindow):
         构建 Tab 3 的 UI 控件。
 
         最简单的 Tab：选择 MOBI 文件 + 输出 TXT 路径 + 转换按钮。
+        没有复杂的设置项，因为 MOBI→TXT 不需要什么配置。
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -485,26 +563,16 @@ class MainWindow(QMainWindow):
         gl = QVBoxLayout(grp)
         gl.setSpacing(8)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('MOBI 文件:'))
         self._le_mobi = QLineEdit()
         self._le_mobi.setPlaceholderText('选择 MOBI 源文件…')
-        h.addWidget(self._le_mobi)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_mobi)
-        h.addWidget(btn)
+        h = self._create_file_row('MOBI 文件:', self._le_mobi,
+                                  self._on_browse_mobi)
         gl.addLayout(h)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('TXT 保存:'))
         self._le_mobi_txt = QLineEdit()
         self._le_mobi_txt.setPlaceholderText('自动生成或手动选择…')
-        h.addWidget(self._le_mobi_txt)
-        btn = QPushButton('浏览')
-        btn.setObjectName('btn_browse')
-        btn.clicked.connect(self._on_browse_mobi_txt)
-        h.addWidget(btn)
+        h = self._create_file_row('TXT 保存:', self._le_mobi_txt,
+                                  self._on_browse_mobi_txt)
         gl.addLayout(h)
         layout.addWidget(grp)
 
@@ -540,6 +608,11 @@ class MainWindow(QMainWindow):
 
         QShortcut 绑定到窗口（self），即窗口获得焦点时生效。
         Ctrl+Enter 和 Ctrl+Return 是两个不同的键码，都要绑定。
+        在大多数键盘上它们对应同一个按键，但在某些布局下可能不同。
+
+        QKeySequence 支持多种格式：
+        - 'Ctrl+Return'    字符串格式
+        - QKeySequence('...')  同上
         """
         from PyQt6.QtGui import QShortcut, QKeySequence
 
@@ -564,6 +637,11 @@ class MainWindow(QMainWindow):
 
         当用户从文件管理器拖文件到窗口上时触发。
         只接受单个 .txt 或 .epub 文件的拖入。
+
+        拖放流程：
+        1. 用户拖动文件到窗口上 → dragEnterEvent 检查是否符合条件
+        2. 符合条件 → acceptProposedAction() 显示拖放提示图标
+        3. 用户松手（放下）→ dropEvent 处理
         """
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
@@ -590,19 +668,6 @@ class MainWindow(QMainWindow):
                 self._tabs.setCurrentIndex(1)
                 self._load_epub_file(path)
 
-    def _line_drag_enter(self, event, ext: str):
-        """行级输入框拖入事件——只接受指定扩展名的文件。"""
-        if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if len(urls) == 1 and urls[0].toLocalFile().lower().endswith(ext):
-                event.acceptProposedAction()
-
-    def _line_drop(self, event, line_edit: QLineEdit):
-        """行级输入框放下事件——将文件路径设到输入框。"""
-        urls = event.mimeData().urls()
-        if urls:
-            line_edit.setText(urls[0].toLocalFile())
-
     # ================================================================
     # Tab 1：槽函数
     # ================================================================
@@ -622,6 +687,15 @@ class MainWindow(QMainWindow):
         1. 把路径设到输入框
         2. 自动填充 EPUB 输出路径、书名、作者、描述
         3. 用 chardet 检测文件编码，显示在状态栏
+
+        自动填充逻辑：
+        - EPUB 输出路径 = TXT 同目录 + 同名 .epub
+        - 书名和作者 = 文件名（不含扩展名）
+        - 描述 = _DEFAULT_DESC（默认描述文字）
+
+        编码检测：
+        用 chardet 库读取文件前 4096 字节判断编码。
+        检测结果仅供参考，用户可以在"高级选项"中手动选择合适的编码。
         """
         self._le_txt.setText(path)
         self._txt_dir, fname = os.path.split(path)
@@ -631,11 +705,12 @@ class MainWindow(QMainWindow):
         self._le_epub.setText(os.path.join(self._txt_dir, base + '.epub'))
         self._le_title.setText(base.strip())
         self._le_author.setText(base.strip())
-        self._le_txt_desc.setText('原始内容源于互联网，仅供个人学习娱乐使用。')
+        self._le_txt_desc.setText(_DEFAULT_DESC)
 
-        # 编码检测——读取文件前 512 字节自动判断编码
+        # 编码检测——读取文件前 4096 字节自动判断编码
+        # chardet.detect 返回 {"encoding": "utf-8", "confidence": 0.99, ...}
         with open(path, 'rb') as f:
-            data = f.read(512)
+            data = f.read(_ENCODE_DETECT_SIZE)
             info = chardet.detect(data)
             enc = info['encoding'] or 'utf-8'
             self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
@@ -654,10 +729,19 @@ class MainWindow(QMainWindow):
         if path:
             self._le_epub.setText(path)
 
+    def _pick_image(self, title='选择封面') -> str:
+        """打开图片选择对话框，返回选中路径或空字符串。
+
+        在 tab1 和 tab2 中被 _on_choose_cover 和 _on_choose_cover2 调用。
+        提取为独立方法避免重复代码。
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self, title, '.', 'Images (*.jpg *.png *.jpeg);;All Files(*)')
+        return path or ''
+
     def _on_choose_cover(self):
         """选择封面图片（tab1）。"""
-        path, _ = QFileDialog.getOpenFileName(
-            self, '选择封面', '.', 'Images (*.jpg *.png *.jpeg);;All Files(*)')
+        path = self._pick_image()
         if path:
             self._txt_cover = path
             self._cover_label.setPixmap(QPixmap(path))
@@ -670,6 +754,11 @@ class MainWindow(QMainWindow):
         用当前设置的编码和正则解析 TXT，提取章节标题列表，
         弹出 ChapterDialog 供用户查看、排序、重命名。
         如果用户调整了顺序，保存到 self._ordered_chapters。
+
+        异常处理：
+        - 如果文件不存在 → 警告提示
+        - 如果解析出错 → 弹出错误对话框 + 日志记录
+        这样可以避免用户因为乱选文件导致程序崩溃。
         """
         txt = self._le_txt.text().strip()
         if not txt or not os.path.exists(txt):
@@ -681,7 +770,7 @@ class MainWindow(QMainWindow):
             if self._cb_encode.currentIndex() != 0:
                 conv.encoding = self._cb_encode.currentText()
             reg = self._te_reg.toPlainText().strip()
-            if len(reg) >= 5:
+            if len(reg) >= _MIN_REGEX_LEN:
                 conv.regex = reg
             chapters = conv.get_chapters()
             dlg = ChapterDialog(chapters, self)
@@ -711,7 +800,7 @@ class MainWindow(QMainWindow):
         self._cover_label.setPixmap(
             QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
         self._cb_encode.setCurrentIndex(0)
-        self._te_reg.setPlainText(self._config.chapter_regex)
+        self._te_reg.setPlainText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self.statusBar().showMessage('已重置')
         logger.info('tab1 重置')
@@ -720,9 +809,12 @@ class MainWindow(QMainWindow):
         """
         开始 TXT→EPUB 转换。
 
-        1. 校验输入
+        1. 校验输入（文件存在、输出路径已填）
         2. 创建 Txt2Epub 实例，设置用户填写的属性
         3. 通过 _run_worker 在后台线程执行
+
+        注意：只有用户填写了值的字段才会传给转换器，
+        空字段使用 Txt2Epub 的默认值。这样可以保持默认行为一致性。
         """
         txt = self._le_txt.text().strip()
         epub = self._le_epub.text().strip()
@@ -752,11 +844,10 @@ class MainWindow(QMainWindow):
         if self._cb_encode.currentIndex() != 0:
             conv.encoding = self._cb_encode.currentText()
         reg = self._te_reg.toPlainText().strip()
-        if len(reg) >= 5:
+        if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
         # 如果有自定义章节顺序，传给转换器
-        if self._ordered_chapters:
-            conv._chapter_order = self._ordered_chapters
+        conv.set_chapter_order(self._ordered_chapters)
 
         self._run_worker(
             target=conv.convert,
@@ -770,6 +861,8 @@ class MainWindow(QMainWindow):
 
         当前只是占位符，因为 MOBI 转换需要 Calibre 的 ebook-convert 工具。
         等后续实现真正转换。
+
+        用 NotImplementedError 而不是静默失败，让用户知道这是待实现功能。
         """
         epub_path = self._le_epub.text().strip()
         if not epub_path:
@@ -802,6 +895,16 @@ class MainWindow(QMainWindow):
 
         Args:
             path: EPUB 文件路径
+
+        提取流程：
+        1. 创建 Epub2Txt 实例（会同时读取 EPUB 到内存）
+        2. 用 get_info() 提取 DC 元数据
+        3. 用 get_cover() 提取封面图片
+        4. 填充到对应的 QLineEdit 和 _cover_label2
+
+        注意：
+        - 日期从 ISO 格式转为友好的显示格式（yyyy-mm-dd HH:MM:SS）
+        - 如果转换失败（错误的 EPUB 文件），弹出警告而不是崩溃
         """
         self._le_in_epub.setText(path)
         self._epub_dir, fname = os.path.split(path)
@@ -850,8 +953,7 @@ class MainWindow(QMainWindow):
 
     def _on_choose_cover2(self):
         """选择封面图片（tab2，用于修改 EPUB 元信息）。"""
-        path, _ = QFileDialog.getOpenFileName(
-            self, '选择封面', '.', 'Images (*.jpg *.png *.jpeg);;All Files(*)')
+        path = self._pick_image('选择封面')
         if path:
             self._epub_cover_path = path
             self._cover_label2.setPixmap(QPixmap(path))
@@ -862,6 +964,12 @@ class MainWindow(QMainWindow):
 
         把用户在 tab2 书籍信息区填写的内容写回 EPUB 文件。
         包括：标题、作者、贡献者、日期、描述、封面。
+
+        流程：
+        1. 验证 EPUB 文件存在
+        2. 创建 BookInfo 填入当前 UI 数据
+        3. 如果有新封面图片，读取其二进制数据
+        4. 调用 Epub2Txt.modi() 写回文件
         """
         epub_path = self._le_in_epub.text().strip()
         if not epub_path or not os.path.exists(epub_path):
@@ -887,8 +995,15 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, '错误', f'保存失败:\n{e}')
             logger.exception('保存元信息失败')
 
-    def _on_convert_tab2(self):
-        """EPUB→TXT 合并转换——所有章节合并为一个 TXT 文件。"""
+    def _run_epub_to_txt(self, chapter_mode: bool):
+        """EPUB→TXT 转换（合并/按章节通用入口）。
+
+        因为合并转换和按章节导出的输入校验和参数设置几乎一样，
+        提取为公共方法，减少重复代码。
+
+        Args:
+            chapter_mode: True=按章节导出, False=合并转换
+        """
         epub_path = self._le_in_epub.text().strip()
         txt_path = self._le_out_txt.text().strip()
         if not epub_path or not os.path.exists(epub_path):
@@ -908,40 +1023,22 @@ class MainWindow(QMainWindow):
             reader.sep = sep.replace('\\n', '\n')
         fanjian = self._chb_fanjian.isChecked()
 
+        target = reader.convert_chapter if chapter_mode else reader.convert
+        msg = '按章节导出完成' if chapter_mode else 'EPUB→TXT 转换完成'
         self._run_worker(
-            target=lambda progress, status: reader.convert(
+            target=lambda progress, status: target(
                 fanjian=fanjian, progress=progress, status=status),
-            success_msg='EPUB→TXT 转换完成',
+            success_msg=msg,
             dir_to_open=os.path.dirname(txt_path),
         )
+
+    def _on_convert_tab2(self):
+        """EPUB→TXT 合并转换。"""
+        self._run_epub_to_txt(False)
 
     def _on_convert_chapter(self):
-        """EPUB→TXT 按章节导出——每章导出为一个独立的 TXT 文件。"""
-        epub_path = self._le_in_epub.text().strip()
-        txt_path = self._le_out_txt.text().strip()
-        if not epub_path or not os.path.exists(epub_path):
-            QMessageBox.warning(self, '提示', '请选择有效的 EPUB 文件')
-            return
-        if not txt_path:
-            QMessageBox.warning(self, '提示', '请指定 TXT 保存路径')
-            return
-
-        self._save_config()
-
-        reader = Epub2Txt(epub_path, txt_path)
-        if self._cb_out_code.currentIndex() != 0:
-            reader.encoding = self._cb_out_code.currentText()
-        sep = self._cb_sep.currentText()
-        if sep and sep != '（无）':
-            reader.sep = sep.replace('\\n', '\n')
-        fanjian = self._chb_fanjian.isChecked()
-
-        self._run_worker(
-            target=lambda progress, status: reader.convert_chapter(
-                fanjian=fanjian, progress=progress, status=status),
-            success_msg='按章节导出完成',
-            dir_to_open=os.path.dirname(txt_path),
-        )
+        """EPUB→TXT 按章节导出。"""
+        self._run_epub_to_txt(True)
 
     def _on_extract_images(self):
         """
@@ -949,6 +1046,11 @@ class MainWindow(QMainWindow):
 
         将 EPUB 中的所有图片提取到输出目录的 images/ 子目录下。
         完成后询问用户是否打开目录。
+
+        用户体验：
+        - 提取成功 → 弹窗显示数量，询问是否打开目录
+        - 没有图片 → 消息提示"未找到图片"
+        - 提取出错 → 弹窗显示错误信息
         """
         epub_path = self._le_in_epub.text().strip()
         if not epub_path or not os.path.exists(epub_path):
@@ -983,6 +1085,13 @@ class MainWindow(QMainWindow):
 
         勾选时：将 EPUB 文件名（中文部分）转为简体，作为 TXT 文件名。
         取消勾选时：恢复为原始文件名。
+
+        为什么在这里同时改文件名？
+        用户勾选繁简转换，说明文件是繁体的，
+        那么输出的 TXT 文件名也应该用简体，保持一致性。
+
+        注意：Qt.CheckState.Checked.value 等于 2（即 Qt.Checked 的值），
+        stateChanged 信号传入的是 int 而不是 Qt.CheckState 枚举。
         """
         epub_path = self._le_in_epub.text().strip()
         if not epub_path:
@@ -990,7 +1099,6 @@ class MainWindow(QMainWindow):
         d, fname = os.path.split(epub_path)
         base, ext = os.path.splitext(fname)
         if state == Qt.CheckState.Checked.value:
-            from opencc import OpenCC
             cc = OpenCC('t2s')
             new_base = cc.convert(base)
             self._le_out_txt.setText(os.path.join(d, new_base + '.txt'))
@@ -1047,13 +1155,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, '提示', '请指定 TXT 保存路径')
             return
 
-        from pathlib import Path as _Path
-
         def _do(progress, status):
             """后台执行 MOBI 转换的入口函数。"""
             if status:
                 status('正在转换 MOBI→TXT…')
-            convert_mobi_to_txt(_Path(mobi_path), _Path(txt_path))
+            convert_mobi_to_txt(Path(mobi_path), Path(txt_path))
 
         self._run_worker(
             target=_do,
@@ -1107,6 +1213,27 @@ class MainWindow(QMainWindow):
         dlg = AboutDialog(self)
         dlg.exec()
 
+    @staticmethod
+    def _create_file_row(label: str, line_edit: QLineEdit,
+                         browse_callback) -> QHBoxLayout:
+        """创建一个带标签 + 输入框 + 浏览按钮的水平行布局。
+
+        在三个 Tab 中被多次复用：
+        Tab 1: TXT 文件行、EPUB 保存行
+        Tab 2: EPUB 文件行、TXT 保存行
+        Tab 3: MOBI 文件行、TXT 保存行
+
+        提取为静态方法避免重复布局代码。
+        """
+        h = QHBoxLayout()
+        h.addWidget(QLabel(label))
+        h.addWidget(line_edit)
+        btn = QPushButton('浏览')
+        btn.setObjectName('btn_browse')
+        btn.clicked.connect(browse_callback)
+        h.addWidget(btn)
+        return h
+
     # ================================================================
     # 后台线程管理
     # ================================================================
@@ -1118,8 +1245,17 @@ class MainWindow(QMainWindow):
         这是连接 UI 和 Worker 的关键方法：
         1. 创建 ProgressWorker，传入业务函数
         2. 连接进度/状态/完成信号到 UI 更新
-        3. 禁用窗口防止重复操作
+        3. 禁用标签页防止重复操作
         4. 启动线程
+
+        信号连接原理：
+        - worker.progress.connect(_progress)：子线程 emit 进度 → 主线程更新进度条
+        - worker.status.connect(_status)：子线程 emit 状态 → 主线程更新状态栏
+        - worker.finished.connect(_done)：子线程结束 → 主线程恢复界面
+
+        PyQt 的信号-槽机制自动处理线程切换：
+        从子线程 emit 信号，槽函数在主线程执行（因为槽函数属于主线程的对象）。
+        不需要手动加锁或使用 QMetaObject.invokeMethod。
 
         Args:
             target: 业务函数，签名 target(progress, status)
@@ -1128,6 +1264,8 @@ class MainWindow(QMainWindow):
         """
 
         # ---- 信号处理闭包 ----
+        # 闭包可以访问 self（外部函数的 __init__ 中定义的控件），
+        # 所以在槽函数里可以直接操作 UI。
 
         def _progress(cur, tot):
             """更新进度条。"""
@@ -1143,7 +1281,8 @@ class MainWindow(QMainWindow):
         def _done(ok, err):
             """转换完成（成功或失败）。"""
             self._progress_bar.setVisible(False)
-            self.setEnabled(True)
+            self._cancel_btn.setVisible(False)
+            self._tabs.setEnabled(True)
             self._worker = None
 
             if ok:
@@ -1159,8 +1298,25 @@ class MainWindow(QMainWindow):
         self._worker.progress.connect(_progress)
         self._worker.status.connect(_status)
         self._worker.finished.connect(_done)
-        self.setEnabled(False)  # 禁用窗口，防止用户重复点击
+        self._cancel_btn.setVisible(True)
+        self._cancel_btn.setEnabled(True)
+        self._cancel_btn.setText('取消')
+        self._tabs.setEnabled(False)  # 禁用标签页，防止用户重复点击
         self._worker.start()
+
+    def _on_cancel_clicked(self):
+        """用户点击取消按钮。
+
+        调用 worker.cancel() 只设置一个标记，
+        真正的停止发生在下一次 progress 回调时。
+        如果业务函数长时间没有调用 progress，取消会有延迟感。
+        这是设计上可以接受的——总比强行终止线程导致数据损坏好。
+        """
+        if self._worker:
+            self._worker.cancel()
+            self._cancel_btn.setEnabled(False)
+            self._cancel_btn.setText('取消中…')
+            self.statusBar().showMessage('正在取消…')
 
     # ================================================================
     # 辅助
@@ -1171,6 +1327,8 @@ class MainWindow(QMainWindow):
         转换完成后弹窗询问是否打开输出目录。
 
         只对存在的目录弹窗。
+        使用 QMessageBox 的静态方法拼接风格（Builder 模式），
+        可以自由组合图标、按钮、消息文本。
         """
         if not dirname or not os.path.isdir(dirname):
             return
@@ -1185,19 +1343,25 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _open_dir(dirname: str):
-        """
-        跨平台打开文件管理器。
+        """跨平台打开文件管理器。
 
-        Windows 用 os.startfile，Linux 用 xdg-open。
-        macOS 也可以用 open 命令，但当前没有处理。
+        各平台的命令：
+        - Windows: os.startfile()（内置，不需要 subprocess）
+        - macOS:   open 命令
+        - Linux:   xdg-open 命令（大多数桌面环境预装）
+
+        为什么不直接用 Python 的 webbrowser 模块？
+        webbrowser.open('file:///path') 在某些系统上会打开浏览器而不是文件管理器。
         """
         if not dirname:
             return
         logger.info(f'打开目录: {dirname}')
         if sys.platform == 'win32':
             os.startfile(dirname)
-        elif sys.platform == 'linux':
-            os.system(f'xdg-open "{dirname}"')
+        elif sys.platform == 'darwin':
+            subprocess.run(['open', dirname], check=False)
+        else:
+            subprocess.run(['xdg-open', dirname], check=False)
 
     def _save_config(self):
         """
@@ -1205,9 +1369,12 @@ class MainWindow(QMainWindow):
 
         包括两个 Tab 的编码、分隔符、正则和繁简转换设置。
         下次启动时通过 _restore_config 恢复。
+
+        注意：这里保存的是"输出编码"（tab2 的编码 ComboBox），
+        而 tab1 的编码存储的是 ComboBox index（因为还有"自动检测"选项）。
         """
         self._config = AppConfig(
-            txt_encoding=self._cb_encode.currentText(),
+            txt_encoding=self._cb_encode.currentIndex(),
             out_encoding=self._cb_out_code.currentText(),
             chapter_sep=self._cb_sep.currentText(),
             chapter_regex=self._te_reg.toPlainText().strip(),
@@ -1220,12 +1387,13 @@ class MainWindow(QMainWindow):
         从 config.json 恢复上次的设置。
 
         findText 匹配下拉框中的文本，匹配不上就保持默认。
+        这样即使 config.json 被手动编辑成了非法值，也不会崩溃。
         """
         cfg = self._config
-        # 编码
-        idx = self._cb_encode.findText(cfg.txt_encoding)
-        if idx >= 0:
-            self._cb_encode.setCurrentIndex(idx)
+        # 编码（txt_encoding 存储的是 ComboBox index）
+        # 范围检查避免 config.json 损坏导致 IndexError
+        if 0 <= cfg.txt_encoding < self._cb_encode.count():
+            self._cb_encode.setCurrentIndex(cfg.txt_encoding)
         idx = self._cb_out_code.findText(cfg.out_encoding)
         if idx >= 0:
             self._cb_out_code.setCurrentIndex(idx)
@@ -1234,12 +1402,16 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._cb_sep.setCurrentIndex(idx)
         # 正则
-        if cfg.chapter_regex:
-            self._te_reg.setPlainText(cfg.chapter_regex)
+        self._te_reg.setPlainText(
+            cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # 繁简
         self._chb_fanjian.setChecked(cfg.fanjian_enabled)
 
     def closeEvent(self, event):
-        """窗口关闭时自动保存配置。"""
+        """窗口关闭时自动保存配置。
+
+        QMainWindow 内置了 closeEvent，重写它可以在窗口关闭前执行清理操作。
+        注意一定要调用 super().closeEvent(event)，否则窗口关不掉。
+        """
         self._save_config()
         super().closeEvent(event)

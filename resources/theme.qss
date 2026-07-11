@@ -6,10 +6,6 @@
 QMainWindow {
     background-color: #F5F5F5;
 }
-QMainWindow::separator {
-    width: 0;
-}
-
 /* --- Tab 控件 --- */
 QTabWidget::pane {
     border: none;
@@ -78,10 +74,6 @@ QLineEdit:disabled {
     background: #F0F0F0;
     color: #9E9E9E;
 }
-QLineEdit[readOnly="true"] {
-    background: #F5F5F5;
-}
-
 /* --- QComboBox --- */
 QComboBox {
     border: 1px solid #E0E0E0;
