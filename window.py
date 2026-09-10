@@ -87,6 +87,10 @@ class _ClickableLabel(QLabel):
     """
     clicked = pyqtSignal()
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+
     def mousePressEvent(self, event):
         """重写鼠标点击事件，发射 clicked 信号。
 
@@ -94,6 +98,13 @@ class _ClickableLabel(QLabel):
         因为前者响应更快，用户体验更好。
         """
         self.clicked.emit()
+
+    def keyPressEvent(self, event):
+        """重写键盘事件，按 Enter/Space 时发射 clicked 信号。"""
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.clicked.emit()
+        else:
+            super().keyPressEvent(event)
 
 
 class _DropLineEdit(QLineEdit):
@@ -251,12 +262,14 @@ class MainWindow(QMainWindow):
 
         self._le_txt = _DropLineEdit('.txt')
         self._le_txt.setPlaceholderText('选择 TXT 源文件…')
+        self._le_txt.setAccessibleName('TXT 源文件路径')
         h = self._create_file_row('TXT 文件:', self._le_txt,
                                   self._on_browse_txt)
         gl.addLayout(h)
 
         self._le_epub = QLineEdit()
         self._le_epub.setPlaceholderText('自动生成或手动选择…')
+        self._le_epub.setAccessibleName('EPUB 保存路径')
         h = self._create_file_row('EPUB 保存:', self._le_epub,
                                   self._on_browse_epub)
         gl.addLayout(h)
@@ -273,10 +286,12 @@ class MainWindow(QMainWindow):
         h.addWidget(QLabel('书名:'))
         self._le_title = QLineEdit()
         self._le_title.setPlaceholderText('默认 = 文件名')
+        self._le_title.setAccessibleName('书名')
         h.addWidget(self._le_title)
         h.addWidget(QLabel('作者:'))
         self._le_author = QLineEdit()
         self._le_author.setPlaceholderText('默认 = 作者')
+        self._le_author.setAccessibleName('作者')
         h.addWidget(self._le_author)
         gl.addLayout(h)
 
@@ -328,21 +343,27 @@ class MainWindow(QMainWindow):
         gl = QVBoxLayout(grp)
         gl.setSpacing(8)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('文件编码:'))
+        # 第一行：文件编码
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel('文件编码:'))
         self._cb_encode = QComboBox()
         self._cb_encode.addItems(
             ['自动检测', 'utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis'])
-        h.addWidget(self._cb_encode)
-        h.addSpacing(20)
-        h.addWidget(QLabel('章节正则:'))
+        row1.addWidget(self._cb_encode)
+        row1.addStretch()
+        gl.addLayout(row1)
+
+        # 第二行：章节正则
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel('章节正则:'))
         self._te_reg = QPlainTextEdit()
         self._te_reg.setFixedHeight(60)
-        self._te_reg.setPlaceholderText('自定义章节匹配正则…')
+        self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
         self._te_reg.setPlainText(
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
-        h.addWidget(self._te_reg)
-        gl.addLayout(h)
+        row2.addWidget(self._te_reg)
+        gl.addLayout(row2)
+
         layout.addWidget(grp)
 
         # ---- 操作 ----
@@ -360,7 +381,7 @@ class MainWindow(QMainWindow):
 
         btn = QPushButton('↺ 重置')
         btn.setObjectName('btn_reset')
-        btn.setToolTip('清空所有输入')
+        btn.setToolTip('清空所有输入 (Ctrl+R)')
         btn.clicked.connect(self._on_reset_tab1)
         gl.addWidget(btn)
 
@@ -373,7 +394,7 @@ class MainWindow(QMainWindow):
         gl.addWidget(btn)
 
         btn = QPushButton('→MOBI')
-        btn.setObjectName('btn_danger')
+        btn.setObjectName('btn_info')
         btn.setToolTip('将 EPUB 转换为 MOBI（需要 Calibre）')
         btn.clicked.connect(self._on_convert_mobi)
         gl.addWidget(btn)
@@ -482,29 +503,36 @@ class MainWindow(QMainWindow):
         # ---- 选项 ----
         # 输出编码、章节分隔符、繁简转换
         grp = QGroupBox('选项')
-        gl = QHBoxLayout(grp)
-        gl.setSpacing(10)
+        gl = QVBoxLayout(grp)
+        gl.setSpacing(8)
 
-        gl.addWidget(QLabel('输出编码:'))
+        # 第一行：编码和分隔符
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel('输出编码:'))
         self._cb_out_code = QComboBox()
         self._cb_out_code.addItems(['utf-8', 'gbk', 'gb2312', 'big5'])
-        gl.addWidget(self._cb_out_code)
+        row1.addWidget(self._cb_out_code)
 
-        gl.addSpacing(12)
-        gl.addWidget(QLabel('章节分隔:'))
+        row1.addSpacing(12)
+        row1.addWidget(QLabel('章节分隔:'))
         self._cb_sep = QComboBox()
         # \\n 在显示时为 "\n"，用户选择后被替换成真正的换行符
         # 这里用双反斜杠是因为在 Python 字符串中 \\n 就是 "\n"（两个字符）
         # Qt 会在 ComboBox 中显示 "\n"，触发编码时替换为 \n（一个换行符）
         self._cb_sep.addItems(['（无）', '\\n', '\\n\\n', '\\n---\\n'])
-        gl.addWidget(self._cb_sep)
+        row1.addWidget(self._cb_sep)
+        row1.addStretch()
+        gl.addLayout(row1)
 
-        gl.addSpacing(12)
+        # 第二行：繁简转换
+        row2 = QHBoxLayout()
         self._chb_fanjian = QCheckBox('繁→简转换')
         self._chb_fanjian.setToolTip('将繁体中文转换为简体中文')
         self._chb_fanjian.stateChanged.connect(self._on_fanjian_toggled)
-        gl.addWidget(self._chb_fanjian)
-        gl.addStretch()
+        row2.addWidget(self._chb_fanjian)
+        row2.addStretch()
+        gl.addLayout(row2)
+
         layout.addWidget(grp)
 
         # ---- 操作 ----
@@ -527,12 +555,15 @@ class MainWindow(QMainWindow):
 
         btn = QPushButton('🖼 提取图片')
         btn.setToolTip('将 EPUB 中的所有图片提取到 images/ 目录')
-        btn.setObjectName('btn_secondary')
+        btn.setObjectName('btn_info')
         btn.clicked.connect(self._on_extract_images)
         gl.addWidget(btn)
 
+        gl.addStretch()
+
         btn = QPushButton('↺ 重置')
         btn.setObjectName('btn_reset')
+        btn.setToolTip('(Ctrl+R)')
         btn.clicked.connect(self._on_reset_tab2)
         gl.addWidget(btn)
 
@@ -647,7 +678,16 @@ class MainWindow(QMainWindow):
             if len(urls) == 1:
                 path = urls[0].toLocalFile().lower()
                 if path.endswith(('.txt', '.epub', '.mobi')):
+                    self.setProperty('dragging', True)
+                    self.style().unpolish(self)
+                    self.style().polish(self)
                     event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        """拖离事件：恢复窗口外观。"""
+        self.setProperty('dragging', False)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def dropEvent(self, event):
         """
@@ -658,6 +698,9 @@ class MainWindow(QMainWindow):
         .epub → 切换到 Tab 2（EPUB→TXT）并加载文件
         .mobi → 切换到 Tab 3（MOBI→TXT）并加载文件
         """
+        self.setProperty('dragging', False)
+        self.style().unpolish(self)
+        self.style().polish(self)
         urls = event.mimeData().urls()
         if urls:
             path = urls[0].toLocalFile()
