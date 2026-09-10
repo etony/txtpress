@@ -33,6 +33,7 @@ from typing import Callable, Optional
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
+from loguru import logger
 from opencc import OpenCC
 import mobi
 
@@ -194,7 +195,10 @@ class Txt2Epub:
             # 捕获的内容也会被包含在结果列表中。
             # 这就是为什么结果交替出现 文本 / 标题 / 文本 / 标题 ...
             # re.M（MULTILINE）让 ^ 匹配每行开头，而不只是字符串开头。
-            self._splits = re.split(self.regex, content, flags=re.M)
+            try:
+                self._splits = re.split(self.regex, content, flags=re.M)
+            except re.error as e:
+                raise ValueError(f'无效的正则表达式: {self.regex}\n{e}')
 
     def get_chapters(self) -> list[str]:
         """
@@ -296,7 +300,7 @@ class Txt2Epub:
         if len(preamble) > _MIN_PREAMBLE_LEN:
             if status:
                 status('正在生成序章…')
-            ch = epub.EpubHtml(title='xu', file_name='xu.xhtml', lang='hr')
+            ch = epub.EpubHtml(title='xu', file_name='xu.xhtml', lang='zh')
             ch.content = preamble + '</p>'
             ch.add_item(nav_css)
             book.add_item(ch)
@@ -323,7 +327,7 @@ class Txt2Epub:
             ch = epub.EpubHtml(
                 title=title.strip(),
                 file_name=f'{safe_name}.xhtml',
-                lang='hr',
+                lang='zh',
             )
             ch.content = f'<h2>{title.strip()}</h2><p>{body}</p>'
             ch.add_item(nav_css)
@@ -375,7 +379,10 @@ class Epub2Txt:
         self.encoding = encoding
         self.sep = ''                                         # 章节间分隔符
         self._dir = os.path.dirname(txt_path) if txt_path else ''  # 输出目录
-        self._book = epub.read_epub(epub_path)                # 读取 EPUB 到内存
+        try:
+            self._book = epub.read_epub(epub_path)            # 读取 EPUB 到内存
+        except Exception as e:
+            raise ValueError(f'无法读取 EPUB 文件: {epub_path}\n{e}')
         self._cc_converter = None                             # 繁简转换器（lazy 初始化）
 
     @property
@@ -416,7 +423,7 @@ class Epub2Txt:
             except Exception:
                 # get_metadata 可能因字段不存在而抛异常，
                 # 跳过即可，保持默认值。
-                pass
+                logger.debug(f'元数据字段 {dc_name} 不存在或为空')
         return info
 
     def get_cover(self) -> Optional[bytes]:
@@ -445,7 +452,7 @@ class Epub2Txt:
                 if item.get_type() in cover_types:
                     return item.get_content()
             except Exception:
-                pass
+                logger.debug(f'封面查找策略一失败: ID={cid}')
 
         # 策略二：按资源类型查找（有些 EPUB 的 covers 在 ITEM_COVER 类型中）
         # 如果有多于 1 个 ITEM_COVER 项，取第二个（第一个通常是元数据占位）
@@ -454,7 +461,7 @@ class Epub2Txt:
             if len(items) > 1:
                 return items[1].get_content()
         except Exception:
-            pass
+            logger.debug('封面查找策略二失败: ITEM_COVER')
 
         # 策略三：在所有图片中找文件名含 cover 的
         try:
@@ -462,7 +469,7 @@ class Epub2Txt:
                 if 'cover' in item.get_name():
                     return item.get_content()
         except Exception:
-            pass
+            logger.debug('封面查找策略三失败: 文件名匹配')
 
         return None
 
@@ -776,22 +783,24 @@ def convert_mobi_to_txt(mobi_path: Path, txt_path: Optional[Path] = None) -> Pat
     tmpdir, _ = mobi.extract(str(mobi_path))
     tmpdir = Path(tmpdir)
 
-    # 找到所有 HTML 文件（包括 .htm），按文件名排序
-    html_files = sorted(tmpdir.rglob('*.html')) + sorted(tmpdir.rglob('*.htm'))
-    if not html_files:
-        raise RuntimeError('未能在解压目录里找到 html 文件')
+    try:
+        # 找到所有 HTML 文件（包括 .htm），按文件名排序
+        html_files = sorted(tmpdir.rglob('*.html')) + sorted(tmpdir.rglob('*.htm'))
+        if not html_files:
+            raise RuntimeError('未能在解压目录里找到 html 文件')
 
-    # 逐个解析 HTML，提取纯文本
-    # get_text(separator='\n', strip=True) 用换行符连接文本块，
-    # 并自动去除首尾空白。
-    parts = []
-    for hf in html_files:
-        soup = BeautifulSoup(hf.read_bytes(), 'html.parser')
-        parts.append(soup.get_text(separator='\n', strip=True))
+        # 逐个解析 HTML，提取纯文本
+        # get_text(separator='\n', strip=True) 用换行符连接文本块，
+        # 并自动去除首尾空白。
+        parts = []
+        for hf in html_files:
+            soup = BeautifulSoup(hf.read_bytes(), 'html.parser')
+            parts.append(soup.get_text(separator='\n', strip=True))
 
-    # 合并写入 TXT
-    txt_path.write_text('\n'.join(parts), encoding='utf-8')
+        # 合并写入 TXT
+        txt_path.write_text('\n'.join(parts), encoding='utf-8')
+    finally:
+        # 清理临时目录（ignore_errors=True 防止权限问题报错）
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
-    # 清理临时目录（ignore_errors=True 防止权限问题报错）
-    shutil.rmtree(tmpdir, ignore_errors=True)
     return txt_path

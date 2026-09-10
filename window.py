@@ -37,7 +37,6 @@ TxtPress — 电子书格式转换工具。主窗口，Tab 布局，绑定所有
 from __future__ import annotations
 
 import os
-import re
 import sys
 import subprocess
 import datetime
@@ -166,6 +165,7 @@ class MainWindow(QMainWindow):
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
         self._ordered_chapters: list[str] | None = None  # 用户通过 ChapterDialog 调整后的章节顺序
+        self._cc_t2s = OpenCC('t2s')               # 繁→简转换器（复用，避免重复初始化）
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
@@ -1097,8 +1097,7 @@ class MainWindow(QMainWindow):
         d, fname = os.path.split(epub_path)
         base, ext = os.path.splitext(fname)
         if state == Qt.CheckState.Checked.value:
-            cc = OpenCC('t2s')
-            new_base = cc.convert(base)
+            new_base = self._cc_t2s.convert(base)
             self._le_out_txt.setText(os.path.join(d, new_base + '.txt'))
         else:
             self._le_out_txt.setText(os.path.join(d, base + '.txt'))

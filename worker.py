@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import threading
 
+from loguru import logger
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -142,6 +143,5 @@ class ProgressWorker(QThread):
         except Exception as e:
             # 任务抛异常了（比如文件不存在、编码错误等），
             # 通过 finished 信号把异常信息传回主线程。
-            import traceback
-            traceback.print_exc()
+            logger.exception('后台任务执行失败')
             self.finished.emit(False, str(e))
