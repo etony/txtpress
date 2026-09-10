@@ -471,8 +471,7 @@ class MainWindow(QMainWindow):
         h.addWidget(self._le_book_desc)
         gl.addLayout(h)
 
-        # 封面 + 操作按钮区域
-        h = QHBoxLayout()
+        # 封面图片
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(100, 140)
@@ -480,22 +479,23 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap)
         self._cover_label2.clicked.connect(self._on_choose_cover2)
-        h.addWidget(self._cover_label2)
 
-        v = QVBoxLayout()
+        cover_row = QHBoxLayout()
+        cover_row.addStretch()
+        cover_row.addWidget(self._cover_label2)
         btn = QPushButton('更换封面')
         btn.setObjectName('btn_secondary')
         btn.setToolTip('选择新封面图片')
         btn.clicked.connect(self._on_choose_cover2)
-        v.addWidget(btn)
+        cover_row.addWidget(btn)
         btn = QPushButton('保存元信息')
         btn.setObjectName('btn_browse')
         btn.setToolTip('将当前编辑的元信息写回 EPUB 文件')
         btn.clicked.connect(self._on_save_metadata)
-        v.addWidget(btn)
-        h.addLayout(v)
-        h.addStretch()
-        gl.addLayout(h)
+        cover_row.addWidget(btn)
+        cover_row.addStretch()
+        gl.addLayout(cover_row)
+
         layout.addWidget(grp)
 
         # ---- 选项 ----
