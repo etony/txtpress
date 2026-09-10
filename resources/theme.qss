@@ -244,6 +244,7 @@ QLabel#cover_label {
     border: 2px solid #E0E0E0;
     border-radius: 4px;
     background: #FFFFFF;
+    padding: 0px;
 }
 QLabel#cover_label:hover {
     border-color: #1976D2;

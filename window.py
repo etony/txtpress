@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
         h.addStretch()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
-        self._cover_label.setFixedSize(100, 140)
+        self._cover_label.setFixedSize(104, 144)
         self._cover_label.setScaledContents(False)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap.scaled(
@@ -479,7 +479,7 @@ class MainWindow(QMainWindow):
         h = QHBoxLayout()
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
-        self._cover_label2.setFixedSize(100, 140)
+        self._cover_label2.setFixedSize(104, 144)
         self._cover_label2.setScaledContents(False)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap.scaled(
