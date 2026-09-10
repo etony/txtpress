@@ -278,61 +278,55 @@ class MainWindow(QMainWindow):
         # ---- 书籍信息 ----
         # 这些字段会写入 EPUB 的元数据区，阅读器中可以看到
         grp = QGroupBox('书籍信息')
-        gl = QVBoxLayout(grp)
+        gl = QGridLayout(grp)
         gl.setSpacing(8)
+        gl.setColumnStretch(1, 1)
+        gl.setColumnStretch(3, 1)
 
         # 第一行：书名 + 作者
-        h = QHBoxLayout()
-        h.addWidget(QLabel('书名:'))
+        gl.addWidget(QLabel('书名:'), 0, 0)
         self._le_title = QLineEdit()
         self._le_title.setPlaceholderText('默认 = 文件名')
         self._le_title.setAccessibleName('书名')
-        h.addWidget(self._le_title)
-        h.addWidget(QLabel('作者:'))
+        gl.addWidget(self._le_title, 0, 1)
+        gl.addWidget(QLabel('作者:'), 0, 2)
         self._le_author = QLineEdit()
         self._le_author.setPlaceholderText('默认 = 作者')
         self._le_author.setAccessibleName('作者')
-        h.addWidget(self._le_author)
-        gl.addLayout(h)
+        gl.addWidget(self._le_author, 0, 3)
 
         # 第二行：贡献者 + 日期
-        h = QHBoxLayout()
-        h.addWidget(QLabel('贡献者:'))
+        gl.addWidget(QLabel('贡献者:'), 1, 0)
         self._le_txt_contrib = QLineEdit()
         self._le_txt_contrib.setPlaceholderText('默认 etony.an@gmail.com')
-        h.addWidget(self._le_txt_contrib)
-        h.addWidget(QLabel('日期:'))
+        gl.addWidget(self._le_txt_contrib, 1, 1)
+        gl.addWidget(QLabel('日期:'), 1, 2)
         self._le_txt_date = QLineEdit()
         self._le_txt_date.setPlaceholderText('默认当前时间 (yyyy-mm-dd)')
-        h.addWidget(self._le_txt_date)
-        gl.addLayout(h)
+        gl.addWidget(self._le_txt_date, 1, 3)
 
         # 第三行：描述
-        h = QHBoxLayout()
-        h.addWidget(QLabel('描述:'))
+        gl.addWidget(QLabel('描述:'), 2, 0)
         self._le_txt_desc = QLineEdit()
         self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
-        h.addWidget(self._le_txt_desc)
-        gl.addLayout(h)
+        gl.addWidget(self._le_txt_desc, 2, 1, 1, 3)
 
         # 第四行：封面图片 + 选择按钮
         # 注意：tab1 和 tab2 各有一个封面标签，但 objectName 都叫 'cover_label'，
         # 这样 QSS 样式可以同时作用于两个封面标签。
-        h = QHBoxLayout()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(100, 140)  # 封面比例约 5:7，接近真实书封面
         self._cover_label.setScaledContents(True)  # 图片自动缩放填满标签
         self._cover_label.setPixmap(QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cover_label.clicked.connect(self._on_choose_cover)
-        h.addWidget(self._cover_label)
+        gl.addWidget(self._cover_label, 3, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
         btn = QPushButton('选择封面')
-        btn.setObjectName('btn_secondary')
+        btn.setObjectName('btn_info')
         btn.setToolTip('选择 EPUB 封面图片')
         btn.clicked.connect(self._on_choose_cover)
-        h.addWidget(btn)
-        h.addStretch()
-        gl.addLayout(h)
+        gl.addWidget(btn, 3, 2, 1, 2)
+
         layout.addWidget(grp)
 
         # ---- 高级选项 ----
@@ -611,6 +605,8 @@ class MainWindow(QMainWindow):
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
 
+        gl.addStretch()
+
         btn = QPushButton('▶ 转换为 TXT')
         btn.setObjectName('btn_action')
         btn.setToolTip('将 MOBI 文件转换为 TXT')
@@ -619,10 +615,9 @@ class MainWindow(QMainWindow):
 
         btn = QPushButton('↺ 重置')
         btn.setObjectName('btn_reset')
+        btn.setToolTip('(Ctrl+R)')
         btn.clicked.connect(self._on_reset_tab3)
         gl.addWidget(btn)
-
-        gl.addStretch()
         layout.addWidget(grp)
         layout.addStretch()
 
