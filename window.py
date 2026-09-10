@@ -473,7 +473,12 @@ class MainWindow(QMainWindow):
         h.addWidget(self._le_book_desc)
         gl.addLayout(h)
 
-        # 封面图片
+        layout.addWidget(grp)
+
+        # ---- 封面图片（独立 GroupBox） ----
+        grp_cover = QGroupBox('封面')
+        gc = QVBoxLayout(grp_cover)
+
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(120, 168)
@@ -495,9 +500,9 @@ class MainWindow(QMainWindow):
         btn.clicked.connect(self._on_save_metadata)
         cover_row.addWidget(btn)
         cover_row.addStretch()
-        gl.addLayout(cover_row)
+        gc.addLayout(cover_row)
 
-        layout.addWidget(grp)
+        layout.addWidget(grp_cover)
 
         # ---- 选项 ----
         # 输出编码、章节分隔符、繁简转换
