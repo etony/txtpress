@@ -334,9 +334,7 @@ class MainWindow(QMainWindow):
         btn.clicked.connect(self._on_choose_cover)
         h.addWidget(btn)
         h.addStretch()
-        gl.addLayout(h)
-
-        layout.addWidget(grp)
+        layout.addLayout(h)
 
         # ---- 高级选项 ----
         # 编码和正则表达式，普通用户一般不需要修改
