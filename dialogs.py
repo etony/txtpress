@@ -24,11 +24,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QIcon
 
-
-# 图片资源路径，相对于当前文件的 resources/images/ 目录
-# 每个文件独立计算 _BASE_DIR，确保无论入口在哪里都能正确找到资源。
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_RES_DIR = os.path.join(_BASE_DIR, 'resources', 'images')
+from constants import RES_DIR
 
 
 class ChapterDialog(QDialog):
@@ -62,7 +58,7 @@ class ChapterDialog(QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle('章节目录预览')
-        self.setWindowIcon(QIcon(os.path.join(_RES_DIR, 'book2.png')))
+        self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'book2.png')))
         self.setMinimumSize(480, 400)
         self.resize(520, 450)
 
@@ -134,7 +130,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('关于 TxtPress')
-        self.setWindowIcon(QIcon(os.path.join(_RES_DIR, 'bookinfo.ico')))
+        self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
         self.setFixedSize(360, 200)  # 固定大小，不让用户拉伸
 
         layout = QVBoxLayout(self)

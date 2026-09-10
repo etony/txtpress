@@ -57,18 +57,14 @@ from pathlib import Path
 from opencc import OpenCC
 
 from models import AppConfig, BookInfo
-from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX, _DEFAULT_DESC
+from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
+from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC
 
 
 # ---- 资源路径 ----
-# _BASE_DIR: 当前文件所在目录，用于定位资源文件和 config.json
-# 注意：__file__ 在打包成 exe 后可能是相对路径或临时路径，
-# os.path.abspath(__file__) 确保拿到的是规范的绝对路径。
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_RES_DIR = os.path.join(_BASE_DIR, 'resources', 'images')
-_CONFIG_PATH = os.path.join(_BASE_DIR, 'config.json')
+# 注意：路径常量现在从 constants.py 导入
 _ENCODE_DETECT_SIZE = 4096  # 编码检测时读取的文件前 4096 字节
 _MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能是误输入）
 
@@ -167,13 +163,13 @@ class MainWindow(QMainWindow):
         self._epub_cover_path = ''                 # tab2 封面路径（用于修改 EPUB 元信息）
         self._txt_dir = ''                         # 当前 TXT 文件所在目录（方便自动填充路径）
         self._epub_dir = ''                        # 当前 EPUB 文件所在目录
-        self._config = AppConfig.load(_CONFIG_PATH) # 从 config.json 加载的配置
+        self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
         self._ordered_chapters: list[str] | None = None  # 用户通过 ChapterDialog 调整后的章节顺序
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
-        self.setWindowIcon(QIcon(os.path.join(_RES_DIR, 'bookinfo.ico')))
+        self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
         self.setMinimumSize(720, 560)
         self.resize(800, 700)  # 默认窗口大小，确保内容完整显示
 
@@ -309,7 +305,7 @@ class MainWindow(QMainWindow):
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(100, 140)  # 封面比例约 5:7，接近真实书封面
         self._cover_label.setScaledContents(True)  # 图片自动缩放填满标签
-        self._cover_label.setPixmap(QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
+        self._cover_label.setPixmap(QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cover_label.clicked.connect(self._on_choose_cover)
         h.addWidget(self._cover_label)
         btn = QPushButton('选择封面')
@@ -460,7 +456,7 @@ class MainWindow(QMainWindow):
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(100, 140)
         self._cover_label2.setScaledContents(True)
-        self._cover_label2.setPixmap(QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
+        self._cover_label2.setPixmap(QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cover_label2.clicked.connect(self._on_choose_cover2)
         h.addWidget(self._cover_label2)
 
@@ -691,7 +687,7 @@ class MainWindow(QMainWindow):
         自动填充逻辑：
         - EPUB 输出路径 = TXT 同目录 + 同名 .epub
         - 书名和作者 = 文件名（不含扩展名）
-        - 描述 = _DEFAULT_DESC（默认描述文字）
+        - 描述 = DEFAULT_DESC（默认描述文字）
 
         编码检测：
         用 chardet 库读取文件前 4096 字节判断编码。
@@ -705,16 +701,18 @@ class MainWindow(QMainWindow):
         self._le_epub.setText(os.path.join(self._txt_dir, base + '.epub'))
         self._le_title.setText(base.strip())
         self._le_author.setText(base.strip())
-        self._le_txt_desc.setText(_DEFAULT_DESC)
+        self._le_txt_desc.setText(DEFAULT_DESC)
 
         # 编码检测——读取文件前 4096 字节自动判断编码
         # chardet.detect 返回 {"encoding": "utf-8", "confidence": 0.99, ...}
+        # 注意：detect可能返回None或字段缺失，需要安全处理
         with open(path, 'rb') as f:
             data = f.read(_ENCODE_DETECT_SIZE)
-            info = chardet.detect(data)
-            enc = info['encoding'] or 'utf-8'
+            info = chardet.detect(data) or {}
+            enc = info.get('encoding') or 'utf-8'
+            lang = info.get('language', '未知')
             self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
-            logger.info(f'文件检测: {fname} 编码={enc} 语言={info["language"]}')
+            logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
 
         logger.info(f'选择 TXT: {path}')
 
@@ -798,7 +796,7 @@ class MainWindow(QMainWindow):
         self._le_txt_desc.clear()
         self._txt_cover = ''
         self._cover_label.setPixmap(
-            QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
+            QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cb_encode.setCurrentIndex(0)
         self._te_reg.setPlainText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
@@ -1116,7 +1114,7 @@ class MainWindow(QMainWindow):
         self._le_book_desc.clear()
         self._epub_cover_path = ''
         self._cover_label2.setPixmap(
-            QPixmap(os.path.join(_RES_DIR, 'cover.jpeg')))
+            QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cb_out_code.setCurrentIndex(0)
         self._cb_sep.setCurrentIndex(0)
         self._chb_fanjian.setChecked(False)
@@ -1380,7 +1378,7 @@ class MainWindow(QMainWindow):
             chapter_regex=self._te_reg.toPlainText().strip(),
             fanjian_enabled=self._chb_fanjian.isChecked(),
         )
-        self._config.save(_CONFIG_PATH)
+        self._config.save(CONFIG_PATH)
 
     def _restore_config(self):
         """

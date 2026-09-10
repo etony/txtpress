@@ -82,8 +82,13 @@ class AppConfig:
         """
         if not os.path.exists(path):
             return cls()
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, IOError, UnicodeDecodeError) as e:
+            import sys
+            print(f'[TxtPress] 配置加载失败，使用默认配置: {e}', file=sys.stderr)
+            return cls()
         # fields(cls) 返回 dataclass 定义的所有字段名，
         # 只保留这些字段，多余的扔掉（安全的配置加载策略）。
         valid_keys = {f.name for f in fields(cls)}

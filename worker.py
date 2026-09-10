@@ -40,6 +40,8 @@ PyQt 的界面（GUI）和后台任务不能在同一个线程里跑。
 
 from __future__ import annotations
 
+import threading
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -91,7 +93,7 @@ class ProgressWorker(QThread):
         self._target = target
         self._args = args or ()
         self._kwargs = kwargs or {}
-        self._cancelled = False  # 用户是否点了取消（线程安全的 bool 标记）
+        self._cancelled = threading.Event()  # 线程安全的取消标记
 
     def cancel(self):
         """请求取消操作。
@@ -99,7 +101,7 @@ class ProgressWorker(QThread):
         只是设一个标记，真正的停止逻辑在 progress 回调中处理。
         主线程调用此方法后，子线程在下一次进度更新时才会感知到取消请求。
         """
-        self._cancelled = True
+        self._cancelled.set()
 
     def run(self):
         """
@@ -121,7 +123,7 @@ class ProgressWorker(QThread):
             self._target(
                 progress=lambda c, t: (
                     self.progress.emit(c, t)
-                    if not self._cancelled
+                    if not self._cancelled.is_set()
                     # 下面这行是一个 Python 技巧：
                     # (_ for _ in ()).throw(CancelledError())
                     # 创建空生成器 -> 往它里面抛异常 -> 表达式结果为该异常

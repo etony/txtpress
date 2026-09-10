@@ -37,16 +37,14 @@ from opencc import OpenCC
 import mobi
 
 from models import BookInfo
+from constants import (
+    DEFAULT_COVER, DEFAULT_AUTHOR, DEFAULT_DESC, DEFAULT_ID
+)
 
 
 # =====================================================================
 # 常量
 # =====================================================================
-
-# _BASE_DIR: services.py 文件所在目录，用于定位资源文件
-# 注意：__file__ 是绝对路径，所以 os.path.abspath 是冗余的，
-# 但加上更明确，也符合惯例。
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 用于过滤过短的序言文本（少于这个字符数就不生成单独的序章章节）
 _MIN_PREAMBLE_LEN = 5
@@ -56,17 +54,6 @@ _MAX_FILENAME_LEN = 50
 
 # 进度状态栏中显示的章节标题最大长度（截断显示，保持状态栏简洁）
 _STATUS_TITLE_LEN = 20
-
-# 默认封面图片路径（程序自带的占位封面，在 resources/images/cover.jpeg）
-_DEFAULT_COVER = os.path.join(_BASE_DIR, 'resources', 'images', 'cover.jpeg')
-
-# 默认作者和贡献者（当用户没填时使用）
-_DEFAULT_AUTHOR = 'etony.an@gmail.com'
-_DEFAULT_DESC = '原始内容源于互联网，仅供个人学习娱乐使用。'
-
-# EPUB 的唯一标识符（类似 ISBN，但不是标准号，只是让 EPUB 合法）
-# 每个 EPUB 文件必须有一个唯一的 identifier。
-_DEFAULT_ID = 'id_etony.an@gmail.com'
 
 # 匹配中文章节标题的正则表达式
 # 匹配"第一章"、"第十二章"、"第二百三十章"、"卷三"、"上回"等
@@ -150,10 +137,10 @@ class Txt2Epub:
         self.epub_path = epub_path
         # ---- 以下属性可在 convert() 前修改 ----
         self.title = 'epub'                                       # 书名（默认用文件名）
-        self.author = _DEFAULT_AUTHOR                             # 作者
+        self.author = DEFAULT_AUTHOR                             # 作者
         self.language = 'cn'                                      # 语言
-        self.id_epub = _DEFAULT_ID                                # EPUB 唯一 ID
-        self.cover_path = _DEFAULT_COVER                          # 封面图片路径
+        self.id_epub = DEFAULT_ID                                # EPUB 唯一 ID
+        self.cover_path = DEFAULT_COVER                          # 封面图片路径
         self.encoding = 'utf-8'                                   # TXT 文件编码
         self.regex = DEFAULT_CHAPTER_REGEX                        # 章节匹配正则
         self.description = ''                                     # EPUB 描述
@@ -161,6 +148,7 @@ class Txt2Epub:
         self.date = ''                                            # 日期
         # ---- 内部状态 ----
         self._splits: Optional[list[str]] = None                  # 解析后的章节片段缓存
+        self._cached_path: str = ''                               # 上次解析时的文件路径（用于缓存失效）
         self._cached_encoding: str = ''                           # 上次解析时的编码（用于缓存失效）
         self._cached_regex: str = ''                              # 上次解析时的正则（用于缓存失效）
         self._chapter_order: Optional[list[str]] = None           # 自定义章节顺序（由 ChapterDialog 设置）
@@ -186,17 +174,18 @@ class Txt2Epub:
         缓存可以避免重复读取大文件。
 
         注意：
-          - 当用户改了编码或正则后，缓存自动失效
-          - 但如果用户改了 txt_path，不会失效（不过实际使用中不会在两次解析间改路径）
+          - 当用户改了编码、正则或文件路径后，缓存自动失效
         """
         cache_valid = (
             self._splits is not None
+            and self._cached_path == self.txt_path
             and self._cached_encoding == self.encoding
             and self._cached_regex == self.regex
         )
         if cache_valid:
             return
         # 记录当前参数，下次调用时判断缓存是否仍然有效
+        self._cached_path = self.txt_path
         self._cached_encoding = self.encoding
         self._cached_regex = self.regex
         with open(self.txt_path, 'r', encoding=self.encoding, errors='replace') as f:
@@ -245,9 +234,9 @@ class Txt2Epub:
         book.set_language(self.language)
         d = self.date or str(datetime.datetime.now())
         book.add_metadata('DC', 'date', d)
-        c = self.contributor or _DEFAULT_AUTHOR
+        c = self.contributor or DEFAULT_AUTHOR
         book.add_metadata('DC', 'contributor', c)
-        desc = self.description or _DEFAULT_DESC
+        desc = self.description or DEFAULT_DESC
         book.add_metadata('DC', 'description', desc)
         book.add_author(self.author)
 
@@ -539,7 +528,7 @@ class Epub2Txt:
         self._book.set_unique_metadata('DC', 'date', info.date)
         self._book.set_unique_metadata('DC', 'creator', info.creator)
         self._book.set_unique_metadata('DC', 'contributor', info.contributor)
-        desc = info.description or _DEFAULT_DESC
+        desc = info.description or DEFAULT_DESC
         self._book.set_unique_metadata('DC', 'description', desc)
         if info.cover is not None:
             # 直接替换已有封面图片内容，而非调用 set_cover()。
