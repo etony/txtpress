@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass, fields, asdict
 from pathlib import Path
 from typing import Optional
@@ -86,7 +87,6 @@ class AppConfig:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         except (json.JSONDecodeError, IOError, UnicodeDecodeError) as e:
-            import sys
             print(f'[TxtPress] 配置加载失败，使用默认配置: {e}', file=sys.stderr)
             return cls()
         # fields(cls) 返回 dataclass 定义的所有字段名，
@@ -106,5 +106,8 @@ class AppConfig:
         ensure_ascii=False 让中文正常显示，而不是转成 \\uXXXX。
         indent=2 让 JSON 文件可读性更好，方便手动查看和调试。
         """
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(asdict(self), f, ensure_ascii=False, indent=2)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(asdict(self), f, ensure_ascii=False, indent=2)
+        except (IOError, OSError) as e:
+            print(f'[TxtPress] 配置保存失败: {e}', file=sys.stderr)

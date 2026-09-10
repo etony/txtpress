@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
         self._ordered_chapters: list[str] | None = None  # 用户通过 ChapterDialog 调整后的章节顺序
-        self._cc_t2s = OpenCC('t2s')               # 繁→简转换器（复用，避免重复初始化）
+        self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
@@ -632,7 +632,7 @@ class MainWindow(QMainWindow):
         窗口级拖入事件。
 
         当用户从文件管理器拖文件到窗口上时触发。
-        只接受单个 .txt 或 .epub 文件的拖入。
+        只接受单个 .txt、.epub 或 .mobi 文件的拖入。
 
         拖放流程：
         1. 用户拖动文件到窗口上 → dragEnterEvent 检查是否符合条件
@@ -643,7 +643,7 @@ class MainWindow(QMainWindow):
             urls = event.mimeData().urls()
             if len(urls) == 1:
                 path = urls[0].toLocalFile().lower()
-                if path.endswith('.txt') or path.endswith('.epub'):
+                if path.endswith(('.txt', '.epub', '.mobi')):
                     event.acceptProposedAction()
 
     def dropEvent(self, event):
@@ -653,6 +653,7 @@ class MainWindow(QMainWindow):
         根据文件类型自动切换到对应 Tab：
         .txt  → 切换到 Tab 1（TXT→EPUB）并加载文件
         .epub → 切换到 Tab 2（EPUB→TXT）并加载文件
+        .mobi → 切换到 Tab 3（MOBI→TXT）并加载文件
         """
         urls = event.mimeData().urls()
         if urls:
@@ -663,6 +664,9 @@ class MainWindow(QMainWindow):
             elif path.lower().endswith('.epub'):
                 self._tabs.setCurrentIndex(1)
                 self._load_epub_file(path)
+            elif path.lower().endswith('.mobi'):
+                self._tabs.setCurrentIndex(2)
+                self._load_mobi_file(path)
 
     # ================================================================
     # Tab 1：槽函数
@@ -925,7 +929,8 @@ class MainWindow(QMainWindow):
                     dt = datetime.datetime.fromisoformat(info.date)
                     self._le_book_date.setText(
                         dt.strftime('%Y-%m-%d %H:%M:%S'))
-                except Exception:
+                except (ValueError, OverflowError) as e:
+                    logger.debug(f'日期解析失败: {info.date} -> {e}')
                     self._le_book_date.setText(info.date)
             self._le_book_desc.setText(info.description)
 
@@ -1097,6 +1102,9 @@ class MainWindow(QMainWindow):
         d, fname = os.path.split(epub_path)
         base, ext = os.path.splitext(fname)
         if state == Qt.CheckState.Checked.value:
+            # lazy初始化OpenCC转换器
+            if self._cc_t2s is None:
+                self._cc_t2s = OpenCC('t2s')
             new_base = self._cc_t2s.convert(base)
             self._le_out_txt.setText(os.path.join(d, new_base + '.txt'))
         else:
@@ -1123,6 +1131,18 @@ class MainWindow(QMainWindow):
     # ================================================================
     # Tab 3：槽函数
     # ================================================================
+
+    def _load_mobi_file(self, path: str):
+        """加载 MOBI 文件到 Tab 3 界面。
+
+        与 _on_browse_mobi 的逻辑相同，但不弹出文件对话框。
+        用于窗口拖放加载 .mobi 文件。
+        """
+        self._le_mobi.setText(path)
+        d, fname = os.path.split(path)
+        base, _ = os.path.splitext(fname)
+        self._le_mobi_txt.setText(os.path.join(d, base + '.txt'))
+        self.statusBar().showMessage(f'已加载: {fname}')
 
     def _on_browse_mobi(self):
         """浏览——选择 MOBI 文件，并自动生成 TXT 保存路径。"""
@@ -1154,9 +1174,10 @@ class MainWindow(QMainWindow):
 
         def _do(progress, status):
             """后台执行 MOBI 转换的入口函数。"""
-            if status:
-                status('正在转换 MOBI→TXT…')
-            convert_mobi_to_txt(Path(mobi_path), Path(txt_path))
+            convert_mobi_to_txt(
+                Path(mobi_path), Path(txt_path),
+                progress=progress, status=status
+            )
 
         self._run_worker(
             target=_do,

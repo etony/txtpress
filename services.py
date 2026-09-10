@@ -35,7 +35,6 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 from loguru import logger
 from opencc import OpenCC
-import mobi
 
 from models import BookInfo
 from constants import (
@@ -301,7 +300,7 @@ class Txt2Epub:
             if status:
                 status('正在生成序章…')
             ch = epub.EpubHtml(title='xu', file_name='xu.xhtml', lang='zh')
-            ch.content = preamble + '</p>'
+            ch.content = f'<p>{preamble}</p>'
             ch.add_item(nav_css)
             book.add_item(ch)
             book.spine.append(ch)
@@ -382,7 +381,7 @@ class Epub2Txt:
         try:
             self._book = epub.read_epub(epub_path)            # 读取 EPUB 到内存
         except Exception as e:
-            raise ValueError(f'无法读取 EPUB 文件: {epub_path}\n{e}')
+            raise ValueError(f'无法读取 EPUB 文件: {epub_path}') from e
         self._cc_converter = None                             # 繁简转换器（lazy 初始化）
 
     @property
@@ -599,7 +598,8 @@ class Epub2Txt:
         Returns:
             处理后的纯文本字符串
         """
-        soup = BeautifulSoup(item.get_content().decode(self.encoding), 'html.parser')
+        # EPUB规范要求XHTML使用UTF-8编码，不应用用户指定的输出编码
+        soup = BeautifulSoup(item.get_content().decode('utf-8'), 'html.parser')
         for tag in soup.find_all(['h1', 'h2', 'h3', 'h4']):
             tag.insert_after(soup.new_string('\n'))
             break  # 只在第一个标题后加换行
@@ -655,6 +655,11 @@ class Epub2Txt:
 
         docs = self._get_content_items()
         total = len(docs)
+
+        # 确保输出目录存在
+        out_dir = os.path.dirname(self.txt_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
 
         with open(self.txt_path, 'w', encoding=self.encoding) as f:
             for idx, item in enumerate(docs, start=1):
@@ -749,7 +754,12 @@ class Epub2Mobi:
 # convert_mobi_to_txt — MOBI → TXT（独立函数）
 # =====================================================================
 
-def convert_mobi_to_txt(mobi_path: Path, txt_path: Optional[Path] = None) -> Path:
+def convert_mobi_to_txt(
+    mobi_path: Path,
+    txt_path: Optional[Path] = None,
+    progress: Optional[Callable[[int, int], None]] = None,
+    status: Optional[Callable[[str], None]] = None,
+) -> Path:
     """
     将 MOBI 文件转换为 TXT。
 
@@ -773,11 +783,19 @@ def convert_mobi_to_txt(mobi_path: Path, txt_path: Optional[Path] = None) -> Pat
     Args:
         mobi_path: MOBI 文件路径
         txt_path:  输出 TXT 路径（不传则自动在 MOBI 同目录生成）
+        progress:  进度回调 (current, total)
+        status:    状态回调 (message)
 
     Returns:
         输出的 TXT 文件路径
     """
+    import mobi
+
     txt_path = txt_path or mobi_path.with_suffix('.txt')
+
+    if status:
+        status('正在解压 MOBI 文件…')
+
     # mobi.extract 返回 (临时目录, 文件名) 的元组
     # tmpdir 是字符串，需转换成 Path 才能用 rglob
     tmpdir, _ = mobi.extract(str(mobi_path))
@@ -789,11 +807,17 @@ def convert_mobi_to_txt(mobi_path: Path, txt_path: Optional[Path] = None) -> Pat
         if not html_files:
             raise RuntimeError('未能在解压目录里找到 html 文件')
 
+        total = len(html_files)
+
         # 逐个解析 HTML，提取纯文本
         # get_text(separator='\n', strip=True) 用换行符连接文本块，
         # 并自动去除首尾空白。
         parts = []
-        for hf in html_files:
+        for idx, hf in enumerate(html_files, start=1):
+            if status:
+                status(f'正在解析第 {idx}/{total} 个文档…')
+            if progress:
+                progress(idx, total)
             soup = BeautifulSoup(hf.read_bytes(), 'html.parser')
             parts.append(soup.get_text(separator='\n', strip=True))
 
