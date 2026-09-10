@@ -51,7 +51,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
     QFileDialog, QMessageBox,
 )
-from PyQt6.QtGui import QIcon, QPixmap, QImage
+from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter
 from pathlib import Path
 from opencc import OpenCC
 
@@ -75,32 +75,35 @@ _MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能�
 # 而 QLabel 设置 setScaledContents(True) 可以自动缩放图片到合适大小。
 
 class _ClickableLabel(QLabel):
-    """支持 clicked 信号的 QLabel。
-
-    用法：
-        label = _ClickableLabel()
-        label.clicked.connect(do_something)
-
-    原理：
-    重写 mousePressEvent（鼠标按下事件），
-    在事件处理器中发射自定义的 clicked 信号。
-    """
+    """支持 clicked 信号的 QLabel，用 paintEvent 自绘制确保图片完整显示。"""
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self._pixmap = QPixmap()
+
+    def setPixmap(self, pixmap):
+        self._pixmap = pixmap
+        self.update()
+
+    def paintEvent(self, event):
+        if self._pixmap and not self._pixmap.isNull():
+            painter = QPainter(self)
+            rect = self.rect()
+            scaled = self._pixmap.scaled(
+                rect.size(),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            x = (rect.width() - scaled.width()) // 2
+            y = (rect.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
 
     def mousePressEvent(self, event):
-        """重写鼠标点击事件，发射 clicked 信号。
-
-        注意：使用 mousePressEvent（按下时触发）而不是 mouseReleaseEvent（释放时触发），
-        因为前者响应更快，用户体验更好。
-        """
         self.clicked.emit()
 
     def keyPressEvent(self, event):
-        """重写键盘事件，按 Enter/Space 时发射 clicked 信号。"""
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.clicked.emit()
         else:
@@ -319,7 +322,6 @@ class MainWindow(QMainWindow):
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(120, 168)
-        self._cover_label.setScaledContents(True)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap)
         self._cover_label.clicked.connect(self._on_choose_cover)
@@ -475,7 +477,6 @@ class MainWindow(QMainWindow):
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(120, 168)
-        self._cover_label2.setScaledContents(True)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap)
         self._cover_label2.clicked.connect(self._on_choose_cover2)
