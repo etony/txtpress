@@ -319,11 +319,10 @@ class MainWindow(QMainWindow):
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(100, 140)
-        self._cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap.scaled(
             100, 140,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         ))
         self._cover_label.clicked.connect(self._on_choose_cover)
@@ -479,7 +478,6 @@ class MainWindow(QMainWindow):
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(100, 140)
-        self._cover_label2.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap.scaled(
             100, 140,
@@ -802,7 +800,7 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(path)
             self._cover_label.setPixmap(pixmap.scaled(
                 100, 140,
-                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             ))
             logger.info(f'封面: {path}')
@@ -860,7 +858,7 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap.scaled(
             100, 140,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         ))
         self._cb_encode.setCurrentIndex(0)
