@@ -311,13 +311,15 @@ class MainWindow(QMainWindow):
         self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
         gl.addWidget(self._le_txt_desc, 2, 1, 1, 3)
 
-        # 第四行：封面图片 + 选择按钮
+        # 封面图片
         # 注意：tab1 和 tab2 各有一个封面标签，但 objectName 都叫 'cover_label'，
         # 这样 QSS 样式可以同时作用于两个封面标签。
+        h = QHBoxLayout()
+        h.addStretch()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
-        self._cover_label.setFixedSize(100, 140)  # 封面比例约 5:7，接近真实书封面
-        self._cover_label.setScaledContents(False)  # 不自动缩放，手动保持比例
+        self._cover_label.setFixedSize(100, 140)
+        self._cover_label.setScaledContents(False)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap.scaled(
             100, 140,
@@ -325,12 +327,14 @@ class MainWindow(QMainWindow):
             Qt.TransformationMode.SmoothTransformation
         ))
         self._cover_label.clicked.connect(self._on_choose_cover)
-        gl.addWidget(self._cover_label, 3, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+        h.addWidget(self._cover_label)
         btn = QPushButton('选择封面')
         btn.setObjectName('btn_info')
         btn.setToolTip('选择 EPUB 封面图片')
         btn.clicked.connect(self._on_choose_cover)
-        gl.addWidget(btn, 3, 2, 1, 2)
+        h.addWidget(btn)
+        h.addStretch()
+        gl.addLayout(h)
 
         layout.addWidget(grp)
 
