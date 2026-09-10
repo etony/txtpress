@@ -170,8 +170,7 @@ class MainWindow(QMainWindow):
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
         self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
-        self.setMinimumSize(720, 560)
-        self.resize(800, 700)  # 默认窗口大小，确保内容完整显示
+        self.setMinimumSize(780, 560)
 
         # ---- 中央控件 ----
         # 整个窗口分为：Tab 标签页 + 底部状态栏
@@ -213,6 +212,10 @@ class MainWindow(QMainWindow):
 
         # ---- 加载配置（恢复上次设置）----
         self._restore_config()
+
+        # 如果没有保存的几何尺寸，使用默认大小
+        if not self._config.window_geometry:
+            self.resize(800, 700)
 
         logger.info('程序加载完成')
 
@@ -1385,7 +1388,8 @@ class MainWindow(QMainWindow):
         """
         保存当前设置到 config.json。
 
-        包括两个 Tab 的编码、分隔符、正则和繁简转换设置。
+        包括两个 Tab 的编码、分隔符、正则和繁简转换设置，
+        以及窗口的几何尺寸（位置和大小）。
         下次启动时通过 _restore_config 恢复。
 
         注意：这里保存的是"输出编码"（tab2 的编码 ComboBox），
@@ -1397,6 +1401,7 @@ class MainWindow(QMainWindow):
             chapter_sep=self._cb_sep.currentText(),
             chapter_regex=self._te_reg.toPlainText().strip(),
             fanjian_enabled=self._chb_fanjian.isChecked(),
+            window_geometry=bytes(self.saveGeometry()),
         )
         self._config.save(CONFIG_PATH)
 
@@ -1424,6 +1429,12 @@ class MainWindow(QMainWindow):
             cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # 繁简
         self._chb_fanjian.setChecked(cfg.fanjian_enabled)
+        # 窗口几何尺寸
+        if cfg.window_geometry:
+            try:
+                self.restoreGeometry(cfg.window_geometry)
+            except Exception:
+                pass  # 几何数据无效时使用默认值
 
     def closeEvent(self, event):
         """窗口关闭时自动保存配置。
