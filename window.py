@@ -74,8 +74,8 @@ _MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能�
 # 为什么不直接用 QPushButton？因为 QPushButton 不能显示图片缩放效果，
 # 而 QLabel 设置 setScaledContents(True) 可以自动缩放图片到合适大小。
 
-class _ClickableLabel(QLabel):
-    """支持 clicked 信号的 QLabel，用 paintEvent 自绘制确保图片完整显示。"""
+class _ClickableLabel(QWidget):
+    """支持 clicked 信号的 QWidget，用 paintEvent 自绘制封面。"""
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -87,18 +87,15 @@ class _ClickableLabel(QLabel):
         self._pixmap = pixmap
         self.update()
 
+    def pixmap(self):
+        return self._pixmap
+
     def paintEvent(self, event):
         if self._pixmap and not self._pixmap.isNull():
             painter = QPainter(self)
-            rect = self.rect()
-            scaled = self._pixmap.scaled(
-                rect.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            x = (rect.width() - scaled.width()) // 2
-            y = (rect.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            target = self.rect()
+            painter.drawPixmap(target, self._pixmap)
 
     def mousePressEvent(self, event):
         self.clicked.emit()
