@@ -483,7 +483,7 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap.scaled(
             100, 140,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         ))
         self._cover_label2.clicked.connect(self._on_choose_cover2)
@@ -1003,7 +1003,7 @@ class MainWindow(QMainWindow):
                 pixmap = QPixmap.fromImage(img)
                 self._cover_label2.setPixmap(pixmap.scaled(
                     100, 140,
-                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.AspectRatioMode.IgnoreAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 ))
 
@@ -1029,7 +1029,7 @@ class MainWindow(QMainWindow):
             pixmap = QPixmap(path)
             self._cover_label2.setPixmap(pixmap.scaled(
                 100, 140,
-                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             ))
 
@@ -1195,7 +1195,7 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap.scaled(
             100, 140,
-            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         ))
         self._cb_out_code.setCurrentIndex(0)
