@@ -318,14 +318,10 @@ class MainWindow(QMainWindow):
         h.addStretch()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
-        self._cover_label.setFixedSize(104, 144)
-        self._cover_label.setScaledContents(False)
+        self._cover_label.setFixedSize(100, 140)
+        self._cover_label.setScaledContents(True)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label.setPixmap(pixmap.scaled(
-            100, 140,
-            Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        ))
+        self._cover_label.setPixmap(pixmap)
         self._cover_label.clicked.connect(self._on_choose_cover)
         h.addWidget(self._cover_label)
         btn = QPushButton('选择封面')
@@ -479,14 +475,10 @@ class MainWindow(QMainWindow):
         h = QHBoxLayout()
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
-        self._cover_label2.setFixedSize(104, 144)
-        self._cover_label2.setScaledContents(False)
+        self._cover_label2.setFixedSize(100, 140)
+        self._cover_label2.setScaledContents(True)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label2.setPixmap(pixmap.scaled(
-            100, 140,
-            Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        ))
+        self._cover_label2.setPixmap(pixmap)
         self._cover_label2.clicked.connect(self._on_choose_cover2)
         h.addWidget(self._cover_label2)
 
@@ -799,12 +791,7 @@ class MainWindow(QMainWindow):
         path = self._pick_image()
         if path:
             self._txt_cover = path
-            pixmap = QPixmap(path)
-            self._cover_label.setPixmap(pixmap.scaled(
-                100, 140,
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            self._cover_label.setPixmap(QPixmap(path))
             logger.info(f'封面: {path}')
 
     def _on_preview_chapters(self):
@@ -858,11 +845,8 @@ class MainWindow(QMainWindow):
         self._le_txt_desc.clear()
         self._txt_cover = ''
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label.setPixmap(pixmap.scaled(
-            100, 140,
-            Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        ))
+        self._cover_label.setPixmap(
+            QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cb_encode.setCurrentIndex(0)
         self._te_reg.setPlainText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
@@ -1000,12 +984,7 @@ class MainWindow(QMainWindow):
             cover_data = reader.get_cover()
             if cover_data:
                 img = QImage.fromData(cover_data)
-                pixmap = QPixmap.fromImage(img)
-                self._cover_label2.setPixmap(pixmap.scaled(
-                    100, 140,
-                    Qt.AspectRatioMode.IgnoreAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                ))
+                self._cover_label2.setPixmap(QPixmap.fromImage(img))
 
             logger.info(f'EPUB 信息: {info}')
             self.statusBar().showMessage(f'已加载: {fname}')
@@ -1026,12 +1005,7 @@ class MainWindow(QMainWindow):
         path = self._pick_image('选择封面')
         if path:
             self._epub_cover_path = path
-            pixmap = QPixmap(path)
-            self._cover_label2.setPixmap(pixmap.scaled(
-                100, 140,
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            self._cover_label2.setPixmap(QPixmap(path))
 
     def _on_save_metadata(self):
         """
@@ -1192,12 +1166,8 @@ class MainWindow(QMainWindow):
         self._le_book_date.clear()
         self._le_book_desc.clear()
         self._epub_cover_path = ''
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label2.setPixmap(pixmap.scaled(
-            100, 140,
-            Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        ))
+        self._cover_label2.setPixmap(
+            QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._cb_out_code.setCurrentIndex(0)
         self._cb_sep.setCurrentIndex(0)
         self._chb_fanjian.setChecked(False)

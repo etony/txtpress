@@ -241,13 +241,12 @@ QLabel {
     background: transparent;
 }
 QLabel#cover_label {
-    border: 2px solid #E0E0E0;
+    border: none;
+    background: #F5F5F5;
     border-radius: 4px;
-    background: #FFFFFF;
-    padding: 0px;
 }
 QLabel#cover_label:hover {
-    border-color: #1976D2;
+    background: #E3F2FD;
 }
 
 /* --- QDialog --- */
