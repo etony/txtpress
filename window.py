@@ -46,7 +46,7 @@ import chardet
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
     QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
     QFileDialog, QMessageBox,
