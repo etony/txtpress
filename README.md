@@ -11,6 +11,7 @@
 | EPUB 元信息编辑 | 读取/修改书名、作者、贡献者、日期、描述、封面 |
 | EPUB 图片提取 | 提取 EPUB 中的所有内嵌图片到目录 |
 | MOBI → TXT | 基于 mobi 库 + BeautifulSoup 提取文本 |
+| MOBI 元信息提取 | 自动提取 MOBI 文件的标题、作者、出版商、ISBN、语言、出版日期 |
 | 章节排序 | 目录预览对话框中拖拽调整章节顺序 |
 | 繁→简转换 | 导出 TXT 时自动转换繁体中文 |
 | 拖放支持 | 从文件管理器拖入 .txt / .epub 文件自动加载 |
@@ -50,7 +51,7 @@ python main.pyw     # Windows 无控制台启动
 txtpress/
 ├── main.py                      # 程序入口
 ├── main.pyw                     # Windows 无控制台启动
-├── window.py                    # 主窗口 UI（~1580 行）
+├── window.py                    # 主窗口 UI（~1750 行）
 ├── services.py                  # 核心转换逻辑
 ├── models.py                    # 数据模型
 ├── worker.py                    # 后台线程
@@ -86,6 +87,9 @@ txtpress/
 - `_setup_tab1()` — TXT → EPUB 页面（源文件 → 书籍信息 → 高级选项 → 操作）
 - `_setup_tab2()` — EPUB → TXT 页面（合并/按章节导出/提取图片/编辑元信息）
 - `_setup_tab3()` — MOBI → TXT 页面
+- `_create_book_info_group()` — 统一书籍信息组布局（封面 + 字段 + 按钮）
+- `_on_choose_cover_impl()` — 封面选择通用实现
+- `_reset_cover()` / `_reset_status()` — 重置辅助方法
 - `_run_worker()` — 启动后台线程，连接进度/状态/完成信号到 UI
 - 快捷键、窗口级和行级拖放支持
 - `_save_config()` / `_restore_config()` — 配置持久化
@@ -104,6 +108,8 @@ txtpress/
 | `Epub2Txt` | EPUB → TXT 转换，含合并导出、按章节导出、元信息读取/修改、封面提取、图片提取 |
 | `Epub2Mobi` | EPUB → MOBI 框架接口（待外部工具实现） |
 | `convert_mobi_to_txt()` | MOBI → TXT 独立函数，基于 mobi 库解压 + BeautifulSoup 解析 HTML |
+| `extract_mobi_metadata()` | 从 MOBI 文件提取元信息（标题、作者、出版商、ISBN、语言、出版日期） |
+| `extract_mobi_cover()` | 从 MOBI 文件提取封面图片 |
 
 所有转换方法接受可选 `progress(current, total)` 和 `status(message)` 回调，通过 `worker.py` 实现实时进度报告。
 
