@@ -49,7 +49,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
-    QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
+    QPushButton, QCheckBox, QProgressBar,
     QFileDialog, QMessageBox, QApplication,
 )
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter, QColor, QPen, QBrush
