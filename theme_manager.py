@@ -53,8 +53,8 @@ QTabBar::tab { background: transparent; color: #888888; padding: 10px 24px; font
 QTabBar::tab:selected { color: #4A9EFF; border-bottom: 3px solid #4A9EFF; background: #2D2D2D; }
 QPushButton#btn_browse { background-color: #5D6D7E; }
 QPushButton#btn_browse:hover { background-color: #4A5568; }
-QPushButton#btn_action { background-color: #2E7D32; }
-QPushButton#btn_action:hover { background-color: #1B5E20; }
+QPushButton#btn_action { background-color: #1976D2; }
+QPushButton#btn_action:hover { background-color: #1565C0; }
 QPushButton#btn_reset { background-color: transparent; color: #888888; border: 1px solid #555555; }
 QPushButton#btn_reset:hover { background-color: #3C3C3C; border-color: #888888; }
 QPushButton#btn_info { background-color: #1565C0; }

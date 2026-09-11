@@ -178,17 +178,17 @@ QPushButton#btn_browse:hover {
     background-color: #607D8B;
 }
 QPushButton#btn_action {
-    background-color: #43A047;
+    background-color: #1976D2;
     padding: 8px 22px;
     font-size: 13px;
     font-weight: 600;
     border-radius: 6px;
 }
 QPushButton#btn_action:hover {
-    background-color: #388E3C;
+    background-color: #1565C0;
 }
 QPushButton#btn_action:pressed {
-    background-color: #2E7D32;
+    background-color: #0D47A1;
 }
 QPushButton#btn_reset {
     background-color: transparent;
