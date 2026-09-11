@@ -49,7 +49,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
     QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
-    QFileDialog, QMessageBox,
+    QFileDialog, QMessageBox, QApplication,
 )
 from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter
 from pathlib import Path
@@ -59,7 +59,9 @@ from models import AppConfig, BookInfo
 from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
-from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC
+from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS
+from error_handler import show_error, show_warning, show_info
+from theme_manager import theme_manager, Theme
 
 
 # ---- 资源路径 ----
@@ -223,6 +225,16 @@ class MainWindow(QMainWindow):
         self._cancel_btn.setFixedHeight(22)
         self._cancel_btn.clicked.connect(self._on_cancel_clicked)
         self.statusBar().addPermanentWidget(self._cancel_btn)
+        
+        # ---- 主题切换按钮 ----
+        self._theme_manager = theme_manager
+        self._theme_manager.set_app(QApplication.instance())
+        self._theme_btn = QPushButton('🌙')
+        self._theme_btn.setFixedSize(30, 22)
+        self._theme_btn.setToolTip('切换深色/浅色主题')
+        self._theme_btn.clicked.connect(self._toggle_theme)
+        self.statusBar().addPermanentWidget(self._theme_btn)
+        
         self.statusBar().showMessage('就绪')
 
         # ---- 快捷键 ----
@@ -346,14 +358,34 @@ class MainWindow(QMainWindow):
             ['自动检测', 'utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis'])
         row.addWidget(self._cb_encode)
         row.addSpacing(12)
-        row.addWidget(QLabel('章节正则:'))
+        
+        # 章节正则预设
+        row.addWidget(QLabel('正则预设:'))
+        self._cb_regex_preset = QComboBox()
+        self._cb_regex_preset.addItems(list(REGEX_PRESETS.keys()))
+        self._cb_regex_preset.currentTextChanged.connect(self._on_regex_preset_changed)
+        row.addWidget(self._cb_regex_preset)
+        row.addStretch()
+        gl.addLayout(row)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel('章节正则:'))
         self._te_reg = QPlainTextEdit()
         self._te_reg.setFixedHeight(60)
         self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
         self._te_reg.setPlainText(
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
-        row.addWidget(self._te_reg)
-        gl.addLayout(row)
+        row2.addWidget(self._te_reg)
+        gl.addLayout(row2)
+        
+        # EPUB样式选择
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel('EPUB样式:'))
+        self._cb_epub_style = QComboBox()
+        self._load_epub_styles()
+        row3.addWidget(self._cb_epub_style)
+        row3.addStretch()
+        gl.addLayout(row3)
 
         layout.addWidget(grp)
 
@@ -873,6 +905,12 @@ class MainWindow(QMainWindow):
             conv.regex = reg
         # 如果有自定义章节顺序，传给转换器
         conv.set_chapter_order(self._ordered_chapters)
+        
+        # 加载EPUB样式
+        style_name = self._cb_epub_style.currentText()
+        css_path = os.path.join(STYLES_DIR, f'{style_name}.css')
+        if os.path.exists(css_path):
+            conv.load_css_from_file(css_path)
 
         self._run_worker(
             target=conv.convert,
@@ -1254,6 +1292,31 @@ class MainWindow(QMainWindow):
         dlg = AboutDialog(self)
         dlg.exec()
 
+    def _toggle_theme(self):
+        """切换深色/浅色主题"""
+        self._theme_manager.toggle_theme()
+        self._theme_btn.setText(self._theme_manager.get_theme_icon())
+        # 保存主题设置
+        self._save_config()
+
+    def _on_regex_preset_changed(self, preset_name: str):
+        """正则预设变更处理"""
+        regex = REGEX_PRESETS.get(preset_name, '')
+        if regex:
+            self._te_reg.setPlainText(regex)
+        # 如果是"自定义"，清空让用户输入
+        if preset_name == '自定义（用户输入）':
+            self._te_reg.clear()
+
+    def _load_epub_styles(self):
+        """加载可用的EPUB样式"""
+        if os.path.exists(STYLES_DIR):
+            for f in sorted(os.listdir(STYLES_DIR)):
+                if f.endswith('.css'):
+                    self._cb_epub_style.addItem(f.replace('.css', ''))
+        if self._cb_epub_style.count() == 0:
+            self._cb_epub_style.addItem('default')
+
     @staticmethod
     def _create_file_row(label: str, line_edit: QLineEdit,
                          browse_callback) -> QHBoxLayout:
@@ -1422,6 +1485,9 @@ class MainWindow(QMainWindow):
             chapter_regex=self._te_reg.toPlainText().strip(),
             fanjian_enabled=self._chb_fanjian.isChecked(),
             window_geometry=bytes(self.saveGeometry()),
+            theme=self._theme_manager.get_current_theme().value,
+            regex_preset=self._cb_regex_preset.currentText(),
+            epub_style=self._cb_epub_style.currentText(),
         )
         self._config.save(CONFIG_PATH)
 
@@ -1455,6 +1521,22 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(cfg.window_geometry)
             except Exception:
                 pass  # 几何数据无效时使用默认值
+        # 主题
+        if hasattr(cfg, 'theme') and cfg.theme:
+            from theme_manager import Theme
+            theme = Theme.DARK if cfg.theme == 'dark' else Theme.LIGHT
+            self._theme_manager.set_theme(theme)
+            self._theme_btn.setText(self._theme_manager.get_theme_icon())
+        # 正则预设
+        if hasattr(cfg, 'regex_preset') and cfg.regex_preset:
+            idx = self._cb_regex_preset.findText(cfg.regex_preset)
+            if idx >= 0:
+                self._cb_regex_preset.setCurrentIndex(idx)
+        # EPUB样式
+        if hasattr(cfg, 'epub_style') and cfg.epub_style:
+            idx = self._cb_epub_style.findText(cfg.epub_style)
+            if idx >= 0:
+                self._cb_epub_style.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         """窗口关闭时自动保存配置。

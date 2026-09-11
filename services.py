@@ -146,12 +146,19 @@ class Txt2Epub:
         self.description = ''                                     # EPUB 描述
         self.contributor = ''                                     # 贡献者
         self.date = ''                                            # 日期
+        self.css_style = CSS_STYLE                                # EPUB CSS样式
         # ---- 内部状态 ----
         self._splits: Optional[list[str]] = None                  # 解析后的章节片段缓存
         self._cached_path: str = ''                               # 上次解析时的文件路径（用于缓存失效）
         self._cached_encoding: str = ''                           # 上次解析时的编码（用于缓存失效）
         self._cached_regex: str = ''                              # 上次解析时的正则（用于缓存失效）
         self._chapter_order: Optional[list[str]] = None           # 自定义章节顺序（由 ChapterDialog 设置）
+
+    def load_css_from_file(self, css_path: str):
+        """从文件加载自定义CSS样式"""
+        if os.path.exists(css_path):
+            with open(css_path, 'r', encoding='utf-8') as f:
+                self.css_style = f.read()
 
     def set_chapter_order(self, ordered: list[str] | None) -> None:
         """设置自定义章节顺序（由 ChapterDialog 拖拽调整后传入）。
@@ -260,7 +267,7 @@ class Txt2Epub:
             uid='style_nav',
             file_name='style/nav.css',
             media_type='text/css',
-            content=CSS_STYLE,
+            content=self.css_style,
         )
         book.add_item(nav_css)
         # spine 定义了 EPUB 的阅读顺序（按什么先后顺序显示章节）

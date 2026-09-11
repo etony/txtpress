@@ -1,0 +1,23 @@
+@namespace epub "http://www.idpf.org/2007/ops";
+body {
+    font-family: Cambria, "Liberation Serif", Georgia, "Times New Roman", serif;
+}
+h1 {
+    text-align: left; text-indent: 2em;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-weight: bold; color: #D2691E; line-height: 300%;
+    margin: 30px 0 0 0;
+}
+h2 {
+    text-align: left; text-indent: 2em;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-weight: bold; color: #D2691E; line-height: 240%;
+    margin: 20px 0 0 0;
+}
+p {
+    text-indent: 1.25em; margin: 0; widows: 2; orphans: 2;
+}
+ol { list-style-type: none; }
+ol > li:first-child { margin-top: 0.3em; }
+nav[epub|type~='toc'] > ol > li > ol { list-style-type: square; }
+nav[epub|type~='toc'] > ol > li > ol > li { margin-top: 0.3em; }

@@ -64,6 +64,9 @@ class AppConfig:
     chapter_regex: str = ''        # 匹配章节标题的正则（空=使用 services.DEFAULT_CHAPTER_REGEX）
     fanjian_enabled: bool = False  # 是否开启繁→简转换
     window_geometry: Optional[bytes] = None  # 窗口几何尺寸（位置和大小）
+    theme: str = 'light'           # 主题设置（light/dark）
+    regex_preset: str = '中文标准（第X章）'  # 正则预设名称
+    epub_style: str = 'default'    # EPUB样式名称
 
     @classmethod
     def load(cls, path: str | Path) -> AppConfig:
