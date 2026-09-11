@@ -606,6 +606,24 @@ class MainWindow(QMainWindow):
         layout.setSpacing(8)
         layout.setContentsMargins(6, 6, 6, 6)
 
+        # ---- 源文件 ----
+        grp = QGroupBox('源文件')
+        gl = QVBoxLayout(grp)
+        gl.setSpacing(10)
+
+        self._le_mobi = QLineEdit()
+        self._le_mobi.setPlaceholderText('选择 MOBI 源文件…')
+        h = self._create_file_row('MOBI 文件:', self._le_mobi,
+                                  self._on_browse_mobi)
+        gl.addLayout(h)
+
+        self._le_mobi_txt = QLineEdit()
+        self._le_mobi_txt.setPlaceholderText('自动生成或手动选择…')
+        h = self._create_file_row('TXT 保存:', self._le_mobi_txt,
+                                  self._on_browse_mobi_txt)
+        gl.addLayout(h)
+        layout.addWidget(grp)
+
         # ---- 书籍信息 ----
         grp = QGroupBox('书籍信息')
         gl = QHBoxLayout(grp)
@@ -659,24 +677,6 @@ class MainWindow(QMainWindow):
         info_layout.addWidget(btn_refresh, 3, 0, 1, 4)
         
         gl.addLayout(info_layout)
-        layout.addWidget(grp)
-
-        # ---- 源文件 ----
-        grp = QGroupBox('源文件')
-        gl = QVBoxLayout(grp)
-        gl.setSpacing(10)
-
-        self._le_mobi = QLineEdit()
-        self._le_mobi.setPlaceholderText('选择 MOBI 源文件…')
-        h = self._create_file_row('MOBI 文件:', self._le_mobi,
-                                  self._on_browse_mobi)
-        gl.addLayout(h)
-
-        self._le_mobi_txt = QLineEdit()
-        self._le_mobi_txt.setPlaceholderText('自动生成或手动选择…')
-        h = self._create_file_row('TXT 保存:', self._le_mobi_txt,
-                                  self._on_browse_mobi_txt)
-        gl.addLayout(h)
         layout.addWidget(grp)
 
         # ---- 操作 ----
