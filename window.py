@@ -359,6 +359,13 @@ class MainWindow(QMainWindow):
         row.addWidget(self._cb_encode)
         row.addSpacing(12)
         
+        # EPUB样式
+        row.addWidget(QLabel('EPUB样式:'))
+        self._cb_epub_style = QComboBox()
+        self._load_epub_styles()
+        row.addWidget(self._cb_epub_style)
+        row.addSpacing(12)
+        
         # 章节正则预设
         row.addWidget(QLabel('正则预设:'))
         self._cb_regex_preset = QComboBox()
@@ -377,15 +384,6 @@ class MainWindow(QMainWindow):
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
         row2.addWidget(self._te_reg)
         gl.addLayout(row2)
-        
-        # EPUB样式选择
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel('EPUB样式:'))
-        self._cb_epub_style = QComboBox()
-        self._load_epub_styles()
-        row3.addWidget(self._cb_epub_style)
-        row3.addStretch()
-        gl.addLayout(row3)
 
         layout.addWidget(grp)
 
