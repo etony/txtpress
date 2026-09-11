@@ -252,6 +252,96 @@ class MainWindow(QMainWindow):
         logger.info('程序加载完成')
 
     # ================================================================
+    # 辅助方法
+    # ================================================================
+
+    def _create_book_info_group(
+        self,
+        cover_label: _ClickableLabel,
+        cover_clicked,
+        fields: list[dict],
+        buttons: list[dict] | None = None,
+        btn_label: str = '选择封面',
+        btn_tooltip: str = '选择 EPUB 封面图片',
+    ) -> QGroupBox:
+        """
+        创建书籍信息组（封面 + 元数据字段）。
+
+        Args:
+            cover_label: 封面图片控件（需预先创建并 setObjectName）
+            cover_clicked: 封面点击信号槽
+            fields: 字段配置列表，每项 {'label', 'widget', 'row', 'col', 'span', 'placeholder'}
+            buttons: 额外按钮列表（Tab2 用），每项 {'text', 'style', 'tooltip', 'handler'}
+            btn_label: 默认按钮文本（无 buttons 时使用）
+            btn_tooltip: 默认按钮提示（无 buttons 时使用）
+
+        Returns:
+            QGroupBox
+        """
+        grp = QGroupBox('书籍信息')
+        gl = QHBoxLayout(grp)
+        gl.setSpacing(10)
+
+        # 封面图片（左侧）
+        cover_label.setFixedSize(120, 168)
+        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
+        cover_label.setPixmap(pixmap)
+        cover_label.clicked.connect(cover_clicked)
+        gl.addWidget(cover_label)
+
+        # 信息字段（右侧）
+        info_layout = QGridLayout()
+        info_layout.setSpacing(8)
+
+        for f in fields:
+            info_layout.addWidget(QLabel(f['label']), f['row'], f['col'])
+            w = f['widget']
+            if 'placeholder' in f:
+                w.setPlaceholderText(f['placeholder'])
+            span = f.get('span', (1, 1))
+            info_layout.addWidget(w, f['row'], f['col'] + 1, span[0], span[1])
+
+        # 按钮行
+        if buttons:
+            btn_layout = QHBoxLayout()
+            for b in buttons:
+                btn = QPushButton(b['text'])
+                btn.setObjectName(b.get('style', 'btn_info'))
+                btn.setToolTip(b.get('tooltip', ''))
+                btn.clicked.connect(b['handler'])
+                btn_layout.addWidget(btn)
+            btn_layout.addStretch()
+            info_layout.addLayout(btn_layout, 3, 0, 1, 4)
+        else:
+            btn = QPushButton(btn_label)
+            btn.setObjectName('btn_info')
+            btn.setToolTip(btn_tooltip)
+            btn.clicked.connect(cover_clicked)
+            info_layout.addWidget(btn, 3, 0, 1, 4)
+
+        gl.addLayout(info_layout)
+        return grp
+
+    def _on_choose_cover_impl(self, cover_attr: str, cover_label: QLabel,
+                              title: str = '选择封面') -> None:
+        """选择封面图片的通用实现。"""
+        path = self._pick_image(title)
+        if path:
+            setattr(self, cover_attr, path)
+            cover_label.setPixmap(QPixmap(path))
+            logger.info(f'封面: {path}')
+
+    def _reset_cover(self, cover_label: QLabel) -> None:
+        """重置封面图片到默认值。"""
+        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
+        cover_label.setPixmap(pixmap)
+
+    def _reset_status(self, tab_name: str) -> None:
+        """统一的重置后状态更新。"""
+        self.statusBar().showMessage('已重置')
+        logger.info(f'{tab_name} 重置')
+
+    # ================================================================
     # Tab 1: TXT → EPUB
     # ================================================================
 
@@ -292,56 +382,32 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 书籍信息 ----
-        grp = QGroupBox('书籍信息')
-        gl = QHBoxLayout(grp)
-        gl.setSpacing(10)
-
-        # 封面图片（左侧）
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
-        self._cover_label.setFixedSize(120, 168)
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label.setPixmap(pixmap)
-        self._cover_label.clicked.connect(self._on_choose_cover)
-        gl.addWidget(self._cover_label)
-
-        # 信息字段（右侧）
-        info_layout = QGridLayout()
-        info_layout.setSpacing(8)
-
-        info_layout.addWidget(QLabel('书名:'), 0, 0)
         self._le_title = QLineEdit()
-        self._le_title.setPlaceholderText('默认 = 文件名')
         self._le_title.setAccessibleName('书名')
-        info_layout.addWidget(self._le_title, 0, 1)
-        info_layout.addWidget(QLabel('作者:'), 0, 2)
         self._le_author = QLineEdit()
-        self._le_author.setPlaceholderText('默认 = 作者')
         self._le_author.setAccessibleName('作者')
-        info_layout.addWidget(self._le_author, 0, 3)
-
-        info_layout.addWidget(QLabel('贡献者:'), 1, 0)
         self._le_txt_contrib = QLineEdit()
-        self._le_txt_contrib.setPlaceholderText('默认 etony.an@gmail.com')
-        info_layout.addWidget(self._le_txt_contrib, 1, 1)
-        info_layout.addWidget(QLabel('日期:'), 1, 2)
         self._le_txt_date = QLineEdit()
-        self._le_txt_date.setPlaceholderText('默认当前时间 (yyyy-mm-dd)')
-        info_layout.addWidget(self._le_txt_date, 1, 3)
-
-        info_layout.addWidget(QLabel('描述:'), 2, 0)
         self._le_txt_desc = QLineEdit()
-        self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
-        info_layout.addWidget(self._le_txt_desc, 2, 1, 1, 3)
 
-        # 选择封面按钮
-        btn = QPushButton('选择封面')
-        btn.setObjectName('btn_info')
-        btn.setToolTip('选择 EPUB 封面图片')
-        btn.clicked.connect(self._on_choose_cover)
-        info_layout.addWidget(btn, 3, 0, 1, 4)
-
-        gl.addLayout(info_layout)
+        grp = self._create_book_info_group(
+            cover_label=self._cover_label,
+            cover_clicked=self._on_choose_cover,
+            fields=[
+                {'label': '书名:', 'widget': self._le_title, 'row': 0, 'col': 0,
+                 'placeholder': '默认 = 文件名'},
+                {'label': '作者:', 'widget': self._le_author, 'row': 0, 'col': 2,
+                 'placeholder': '默认 = 作者'},
+                {'label': '贡献者:', 'widget': self._le_txt_contrib, 'row': 1, 'col': 0,
+                 'placeholder': '默认 etony.an@gmail.com'},
+                {'label': '日期:', 'widget': self._le_txt_date, 'row': 1, 'col': 2,
+                 'placeholder': '默认当前时间 (yyyy-mm-dd)'},
+                {'label': '描述:', 'widget': self._le_txt_desc, 'row': 2, 'col': 0,
+                 'span': (1, 3), 'placeholder': 'EPUB 描述信息 (dc:description，可选)'},
+            ],
+        )
         layout.addWidget(grp)
 
         # ---- 高级选项 ----
@@ -474,58 +540,33 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 书籍信息 ----
-        grp = QGroupBox('书籍信息')
-        gl = QHBoxLayout(grp)
-        gl.setSpacing(10)
-
-        # 封面图片（左侧）
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
-        self._cover_label2.setFixedSize(120, 168)
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label2.setPixmap(pixmap)
-        self._cover_label2.clicked.connect(self._on_choose_cover2)
-        gl.addWidget(self._cover_label2)
-
-        # 信息字段（右侧）
-        info_layout = QGridLayout()
-        info_layout.setSpacing(8)
-
-        info_layout.addWidget(QLabel('书名:'), 0, 0)
         self._le_book_title = QLineEdit()
-        info_layout.addWidget(self._le_book_title, 0, 1)
-        info_layout.addWidget(QLabel('作者:'), 0, 2)
         self._le_book_creator = QLineEdit()
-        info_layout.addWidget(self._le_book_creator, 0, 3)
-
-        info_layout.addWidget(QLabel('贡献者:'), 1, 0)
         self._le_book_contrib = QLineEdit()
-        info_layout.addWidget(self._le_book_contrib, 1, 1)
-        info_layout.addWidget(QLabel('日期:'), 1, 2)
         self._le_book_date = QLineEdit()
-        info_layout.addWidget(self._le_book_date, 1, 3)
-
-        info_layout.addWidget(QLabel('描述:'), 2, 0)
         self._le_book_desc = QLineEdit()
-        self._le_book_desc.setPlaceholderText('EPUB 描述信息 (dc:description)')
-        info_layout.addWidget(self._le_book_desc, 2, 1, 1, 3)
 
-        # 按钮行
-        btn_layout = QHBoxLayout()
-        btn = QPushButton('更换封面')
-        btn.setObjectName('btn_info')
-        btn.setToolTip('选择新封面图片')
-        btn.clicked.connect(self._on_choose_cover2)
-        btn_layout.addWidget(btn)
-        btn = QPushButton('保存元信息')
-        btn.setObjectName('btn_secondary')
-        btn.setToolTip('将当前编辑的元信息写回 EPUB 文件')
-        btn.clicked.connect(self._on_save_metadata)
-        btn_layout.addWidget(btn)
-        btn_layout.addStretch()
-        info_layout.addLayout(btn_layout, 3, 0, 1, 4)
-
-        gl.addLayout(info_layout)
+        grp = self._create_book_info_group(
+            cover_label=self._cover_label2,
+            cover_clicked=self._on_choose_cover2,
+            fields=[
+                {'label': '书名:', 'widget': self._le_book_title, 'row': 0, 'col': 0},
+                {'label': '作者:', 'widget': self._le_book_creator, 'row': 0, 'col': 2},
+                {'label': '贡献者:', 'widget': self._le_book_contrib, 'row': 1, 'col': 0},
+                {'label': '日期:', 'widget': self._le_book_date, 'row': 1, 'col': 2},
+                {'label': '描述:', 'widget': self._le_book_desc, 'row': 2, 'col': 0,
+                 'span': (1, 3), 'placeholder': 'EPUB 描述信息 (dc:description)'},
+            ],
+            buttons=[
+                {'text': '更换封面', 'style': 'btn_info', 'tooltip': '选择新封面图片',
+                 'handler': self._on_choose_cover2},
+                {'text': '保存元信息', 'style': 'btn_secondary',
+                 'tooltip': '将当前编辑的元信息写回 EPUB 文件',
+                 'handler': self._on_save_metadata},
+            ],
+        )
         layout.addWidget(grp)
 
         # ---- 选项 ----
@@ -862,11 +903,7 @@ class MainWindow(QMainWindow):
 
     def _on_choose_cover(self):
         """选择封面图片（tab1）。"""
-        path = self._pick_image()
-        if path:
-            self._txt_cover = path
-            self._cover_label.setPixmap(QPixmap(path))
-            logger.info(f'封面: {path}')
+        self._on_choose_cover_impl('_txt_cover', self._cover_label)
 
     def _on_preview_chapters(self):
         """
@@ -910,21 +947,16 @@ class MainWindow(QMainWindow):
 
     def _on_reset_tab1(self):
         """重置 tab1 的所有输入。"""
-        self._le_txt.clear()
-        self._le_epub.clear()
-        self._le_title.clear()
-        self._le_author.clear()
-        self._le_txt_contrib.clear()
-        self._le_txt_date.clear()
-        self._le_txt_desc.clear()
+        for w in (self._le_txt, self._le_epub, self._le_title,
+                  self._le_author, self._le_txt_contrib,
+                  self._le_txt_date, self._le_txt_desc):
+            w.clear()
         self._txt_cover = ''
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label.setPixmap(pixmap)
+        self._reset_cover(self._cover_label)
         self._cb_encode.setCurrentIndex(0)
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
-        self.statusBar().showMessage('已重置')
-        logger.info('tab1 重置')
+        self._reset_status('tab1')
 
     def _on_convert_tab1(self):
         """
@@ -1099,10 +1131,7 @@ class MainWindow(QMainWindow):
 
     def _on_choose_cover2(self):
         """选择封面图片（tab2，用于修改 EPUB 元信息）。"""
-        path = self._pick_image('选择封面')
-        if path:
-            self._epub_cover_path = path
-            self._cover_label2.setPixmap(QPixmap(path))
+        self._on_choose_cover_impl('_epub_cover_path', self._cover_label2)
 
     def _on_save_metadata(self):
         """
@@ -1255,21 +1284,16 @@ class MainWindow(QMainWindow):
 
     def _on_reset_tab2(self):
         """重置 tab2 的所有输入。"""
-        self._le_in_epub.clear()
-        self._le_out_txt.clear()
-        self._le_book_title.clear()
-        self._le_book_creator.clear()
-        self._le_book_contrib.clear()
-        self._le_book_date.clear()
-        self._le_book_desc.clear()
+        for w in (self._le_in_epub, self._le_out_txt, self._le_book_title,
+                  self._le_book_creator, self._le_book_contrib,
+                  self._le_book_date, self._le_book_desc):
+            w.clear()
         self._epub_cover_path = ''
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._cover_label2.setPixmap(pixmap)
+        self._reset_cover(self._cover_label2)
         self._cb_out_code.setCurrentIndex(0)
         self._cb_sep.setCurrentIndex(0)
         self._chb_fanjian.setChecked(False)
-        self.statusBar().showMessage('已重置')
-        logger.info('tab2 重置')
+        self._reset_status('tab2')
 
     # ================================================================
     # Tab 3：槽函数
@@ -1376,18 +1400,14 @@ class MainWindow(QMainWindow):
 
     def _on_reset_tab3(self):
         """重置 tab3 的所有输入。"""
-        self._le_mobi.clear()
-        self._le_mobi_txt.clear()
-        self._mobi_book_title.clear()
-        self._mobi_book_author.clear()
-        self._mobi_book_publisher.clear()
-        self._mobi_book_isbn.clear()
-        self._mobi_book_language.clear()
-        self._mobi_book_published.clear()
+        for w in (self._le_mobi, self._le_mobi_txt, self._mobi_book_title,
+                  self._mobi_book_author, self._mobi_book_publisher,
+                  self._mobi_book_isbn, self._mobi_book_language,
+                  self._mobi_book_published):
+            w.clear()
         self._mobi_lbl_cover.clear()
         self._mobi_lbl_cover.setText('')
-        self.statusBar().showMessage('已重置')
-        logger.info('tab3 重置')
+        self._reset_status('tab3')
 
     # ================================================================
     # 快捷键处理
