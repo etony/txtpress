@@ -1296,6 +1296,38 @@ class MainWindow(QMainWindow):
             d, fname = os.path.split(path)
             base, _ = os.path.splitext(fname)
             self._le_mobi_txt.setText(os.path.join(d, base + '.txt'))
+            
+            # 自动提取书籍信息
+            self._load_mobi_metadata(path)
+
+    def _load_mobi_metadata(self, mobi_path: str):
+        """加载 MOBI 文件的书籍信息"""
+        from services import extract_mobi_metadata, extract_mobi_cover
+        
+        metadata = extract_mobi_metadata(Path(mobi_path))
+        
+        # 填充信息字段
+        self._mobi_book_title.setText(metadata.get('title', ''))
+        self._mobi_book_author.setText(metadata.get('creator', ''))
+        self._mobi_book_publisher.setText(metadata.get('publisher', ''))
+        self._mobi_book_isbn.setText(metadata.get('isbn', ''))
+        self._mobi_book_language.setText(metadata.get('language', ''))
+        self._mobi_book_published.setText(metadata.get('published', ''))
+        
+        # 提取并显示封面
+        cover_offset = metadata.get('cover_offset')
+        if cover_offset is not None:
+            cover_data = extract_mobi_cover(Path(mobi_path), cover_offset)
+            if cover_data:
+                pixmap = QPixmap()
+                pixmap.loadFromData(cover_data)
+                self._mobi_lbl_cover.setPixmap(pixmap.scaled(
+                    120, 160, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation))
+            else:
+                self._mobi_lbl_cover.setText('无封面')
+        else:
+            self._mobi_lbl_cover.setText('无封面')
 
     def _on_browse_mobi_txt(self):
         """浏览——选择 TXT 保存路径。"""
