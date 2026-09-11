@@ -902,17 +902,38 @@ def extract_mobi_cover(mobi_path: Path, cover_offset: int) -> Optional[bytes]:
 
     Args:
         mobi_path: MOBI 文件路径
-        cover_offset: 封面图片偏移量
+        cover_offset: 封面图片偏移量（未使用，保留接口兼容）
 
     Returns:
         封面图片的二进制数据，如果提取失败返回 None
     """
+    import mobi
+    
     try:
-        from mobi.mobi_sectioner import Sectionizer
+        # 使用 mobi.extract 解压 MOBI 文件到临时目录
+        tmpdir, _ = mobi.extract(str(mobi_path))
+        tmpdir = Path(tmpdir)
         
-        sect = Sectionizer(str(mobi_path))
-        cover_data = sect.loadSection(cover_offset)
-        return cover_data
+        try:
+            # 在临时目录中查找图片文件（优先查找 cover 相关文件）
+            cover_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+            
+            # 首先查找文件名包含 cover 的图片
+            for ext in cover_extensions:
+                for img_file in tmpdir.rglob(f'*cover*{ext}'):
+                    return img_file.read_bytes()
+            
+            # 如果没有找到 cover 文件，查找第一个图片文件
+            for ext in cover_extensions:
+                for img_file in tmpdir.rglob(f'*{ext}'):
+                    return img_file.read_bytes()
+            
+            return None
+        finally:
+            # 清理临时目录
+            import shutil
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            
     except Exception as e:
         logger.error(f'提取 MOBI 封面失败: {e}')
         return None
