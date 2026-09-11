@@ -247,25 +247,20 @@ class MainWindow(QMainWindow):
 
         布局（从上到下）：
           源文件    → TXT 文件路径 + EPUB 保存路径
-          书籍信息  → 书名 / 作者 / 贡献者 / 日期 / 描述 / 封面
+          书籍信息  → 书名 / 作者 / 贡献者 / 日期 / 描述
+          封面      → 封面图片 + 选择按钮
           高级选项  → 文件编码 + 章节正则
-          操作      → 目录预览 / 重置 / 开始转换 / →MOBI
-
-        布局思路：
-        - 每个区域用一个 QGroupBox 包裹（带标题边框的分组框）
-        - 组内用 QVBoxLayout 垂直排列，行内用 QHBoxLayout 水平排列
-        - setSpacing / setContentsMargins 控制间距，让界面不拥挤
+          操作      → 开始转换 / →MOBI / 目录预览 / 重置
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setSpacing(4)
-        layout.setContentsMargins(2, 4, 2, 4)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         # ---- 源文件 ----
-        # 用户选择 TXT 源文件和指定 EPUB 输出位置
         grp = QGroupBox('源文件')
         gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
 
         self._le_txt = _DropLineEdit('.txt')
         self._le_txt.setPlaceholderText('选择 TXT 源文件…')
@@ -283,14 +278,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 书籍信息 ----
-        # 这些字段会写入 EPUB 的元数据区，阅读器中可以看到
         grp = QGroupBox('书籍信息')
         gl = QGridLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
         gl.setColumnStretch(1, 1)
         gl.setColumnStretch(3, 1)
 
-        # 第一行：书名 + 作者
         gl.addWidget(QLabel('书名:'), 0, 0)
         self._le_title = QLineEdit()
         self._le_title.setPlaceholderText('默认 = 文件名')
@@ -302,7 +295,6 @@ class MainWindow(QMainWindow):
         self._le_author.setAccessibleName('作者')
         gl.addWidget(self._le_author, 0, 3)
 
-        # 第二行：贡献者 + 日期
         gl.addWidget(QLabel('贡献者:'), 1, 0)
         self._le_txt_contrib = QLineEdit()
         self._le_txt_contrib.setPlaceholderText('默认 etony.an@gmail.com')
@@ -312,41 +304,41 @@ class MainWindow(QMainWindow):
         self._le_txt_date.setPlaceholderText('默认当前时间 (yyyy-mm-dd)')
         gl.addWidget(self._le_txt_date, 1, 3)
 
-        # 第三行：描述
         gl.addWidget(QLabel('描述:'), 2, 0)
         self._le_txt_desc = QLineEdit()
         self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
         gl.addWidget(self._le_txt_desc, 2, 1, 1, 3)
 
-        # 封面图片
-        # 注意：tab1 和 tab2 各有一个封面标签，但 objectName 都叫 'cover_label'，
-        # 这样 QSS 样式可以同时作用于两个封面标签。
-        h = QHBoxLayout()
-        h.addStretch()
+        layout.addWidget(grp)
+
+        # ---- 封面 ----
+        grp_cover = QGroupBox('封面')
+        gc = QVBoxLayout(grp_cover)
+
+        cover_row = QHBoxLayout()
+        cover_row.addStretch()
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(120, 168)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap)
         self._cover_label.clicked.connect(self._on_choose_cover)
-        h.addWidget(self._cover_label)
+        cover_row.addWidget(self._cover_label)
         btn = QPushButton('选择封面')
         btn.setObjectName('btn_info')
         btn.setToolTip('选择 EPUB 封面图片')
         btn.clicked.connect(self._on_choose_cover)
-        h.addWidget(btn)
-        h.addStretch()
-        layout.addLayout(h)
+        cover_row.addWidget(btn)
+        cover_row.addStretch()
+        gc.addLayout(cover_row)
+
+        layout.addWidget(grp_cover)
 
         # ---- 高级选项 ----
-        # 编码和正则表达式，普通用户一般不需要修改
-        # 用 QPlainTextEdit（多行输入）而不是 QLineEdit 来放正则，
-        # 因为复杂的正则需要换行查看和编辑。
-        grp = QGroupBox('高级选项')
+        grp = QGroupBox('选项')
         gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
 
-        # 第一行：文件编码
         row1 = QHBoxLayout()
         row1.addWidget(QLabel('文件编码:'))
         self._cb_encode = QComboBox()
@@ -356,7 +348,6 @@ class MainWindow(QMainWindow):
         row1.addStretch()
         gl.addLayout(row1)
 
-        # 第二行：章节正则
         row2 = QHBoxLayout()
         row2.addWidget(QLabel('章节正则:'))
         self._te_reg = QPlainTextEdit()
@@ -370,25 +361,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 操作 ----
-        # 底部按钮区域：辅助功能在左，主要操作在右
-        # 用 addStretch() 把按钮推到两边
         grp = QGroupBox('操作')
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
-
-        btn = QPushButton('📑 目录预览')
-        btn.setToolTip('预览 TXT 文件中的章节列表')
-        btn.setObjectName('btn_secondary')
-        btn.clicked.connect(self._on_preview_chapters)
-        gl.addWidget(btn)
-
-        btn = QPushButton('↺ 重置')
-        btn.setObjectName('btn_reset')
-        btn.setToolTip('清空所有输入 (Ctrl+R)')
-        btn.clicked.connect(self._on_reset_tab1)
-        gl.addWidget(btn)
-
-        gl.addStretch()
 
         btn = QPushButton('▶ 开始转换')
         btn.setObjectName('btn_action')
@@ -402,8 +377,21 @@ class MainWindow(QMainWindow):
         btn.clicked.connect(self._on_convert_mobi)
         gl.addWidget(btn)
 
+        gl.addStretch()
+
+        btn = QPushButton('📑 目录预览')
+        btn.setToolTip('预览 TXT 文件中的章节列表')
+        btn.setObjectName('btn_secondary')
+        btn.clicked.connect(self._on_preview_chapters)
+        gl.addWidget(btn)
+
+        btn = QPushButton('↺ 重置')
+        btn.setObjectName('btn_reset')
+        btn.setToolTip('清空所有输入 (Ctrl+R)')
+        btn.clicked.connect(self._on_reset_tab1)
+        gl.addWidget(btn)
+
         layout.addWidget(grp)
-        layout.addStretch()
 
         self._tabs.addTab(tab, 'TXT → EPUB')
 
@@ -416,22 +404,21 @@ class MainWindow(QMainWindow):
         构建 Tab 2 的 UI 控件。
 
         相比 Tab 1，增加了"繁简转换"选项和多种输出模式。
-        布局结构与 Tab 1 类似：源文件 → 书籍信息 → 选项 → 操作。
+        布局结构与 Tab 1 类似：源文件 → 书籍信息 → 封面 → 选项 → 操作。
 
         两个 Tab 的"书籍信息"区域的 UI 几乎相同但数据不共享：
         - tab1 的书籍信息用于创建新的 EPUB
         - tab2 的书籍信息从已有 EPUB 读取，并可写回
-        之所以不共用，是为了避免用户在一个 tab 输入的数据污染另一个 tab。
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setSpacing(4)
-        layout.setContentsMargins(2, 4, 2, 4)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         # ---- 源文件 ----
         grp = QGroupBox('源文件')
         gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
 
         self._le_in_epub = _DropLineEdit('.epub')
         self._le_in_epub.setPlaceholderText('选择 EPUB 源文件…')
@@ -447,59 +434,53 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 书籍信息 ----
-        # 从 EPUB 中读取的元数据，可以修改后写回
         grp = QGroupBox('书籍信息')
-        gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl = QGridLayout(grp)
+        gl.setSpacing(10)
+        gl.setColumnStretch(1, 1)
+        gl.setColumnStretch(3, 1)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('书名:'))
+        gl.addWidget(QLabel('书名:'), 0, 0)
         self._le_book_title = QLineEdit()
-        h.addWidget(self._le_book_title)
-        h.addWidget(QLabel('作者:'))
+        gl.addWidget(self._le_book_title, 0, 1)
+        gl.addWidget(QLabel('作者:'), 0, 2)
         self._le_book_creator = QLineEdit()
-        h.addWidget(self._le_book_creator)
-        gl.addLayout(h)
+        gl.addWidget(self._le_book_creator, 0, 3)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('贡献者:'))
+        gl.addWidget(QLabel('贡献者:'), 1, 0)
         self._le_book_contrib = QLineEdit()
-        h.addWidget(self._le_book_contrib)
-        h.addWidget(QLabel('日期:'))
+        gl.addWidget(self._le_book_contrib, 1, 1)
+        gl.addWidget(QLabel('日期:'), 1, 2)
         self._le_book_date = QLineEdit()
-        h.addWidget(self._le_book_date)
-        gl.addLayout(h)
+        gl.addWidget(self._le_book_date, 1, 3)
 
-        h = QHBoxLayout()
-        h.addWidget(QLabel('描述:'))
+        gl.addWidget(QLabel('描述:'), 2, 0)
         self._le_book_desc = QLineEdit()
         self._le_book_desc.setPlaceholderText('EPUB 描述信息 (dc:description)')
-        h.addWidget(self._le_book_desc)
-        gl.addLayout(h)
+        gl.addWidget(self._le_book_desc, 2, 1, 1, 3)
 
         layout.addWidget(grp)
 
-        # ---- 封面图片（独立 GroupBox） ----
+        # ---- 封面 ----
         grp_cover = QGroupBox('封面')
         gc = QVBoxLayout(grp_cover)
 
+        cover_row = QHBoxLayout()
+        cover_row.addStretch()
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(120, 168)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap)
         self._cover_label2.clicked.connect(self._on_choose_cover2)
-
-        cover_row = QHBoxLayout()
-        cover_row.addStretch()
         cover_row.addWidget(self._cover_label2)
         btn = QPushButton('更换封面')
-        btn.setObjectName('btn_secondary')
+        btn.setObjectName('btn_info')
         btn.setToolTip('选择新封面图片')
         btn.clicked.connect(self._on_choose_cover2)
         cover_row.addWidget(btn)
         btn = QPushButton('保存元信息')
-        btn.setObjectName('btn_browse')
+        btn.setObjectName('btn_secondary')
         btn.setToolTip('将当前编辑的元信息写回 EPUB 文件')
         btn.clicked.connect(self._on_save_metadata)
         cover_row.addWidget(btn)
@@ -509,30 +490,23 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp_cover)
 
         # ---- 选项 ----
-        # 输出编码、章节分隔符、繁简转换
         grp = QGroupBox('选项')
         gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
 
-        # 第一行：编码和分隔符
         row1 = QHBoxLayout()
         row1.addWidget(QLabel('输出编码:'))
         self._cb_out_code = QComboBox()
         self._cb_out_code.addItems(['utf-8', 'gbk', 'gb2312', 'big5'])
         row1.addWidget(self._cb_out_code)
-
         row1.addSpacing(12)
         row1.addWidget(QLabel('章节分隔:'))
         self._cb_sep = QComboBox()
-        # \\n 在显示时为 "\n"，用户选择后被替换成真正的换行符
-        # 这里用双反斜杠是因为在 Python 字符串中 \\n 就是 "\n"（两个字符）
-        # Qt 会在 ComboBox 中显示 "\n"，触发编码时替换为 \n（一个换行符）
         self._cb_sep.addItems(['（无）', '\\n', '\\n\\n', '\\n---\\n'])
         row1.addWidget(self._cb_sep)
         row1.addStretch()
         gl.addLayout(row1)
 
-        # 第二行：繁简转换
         row2 = QHBoxLayout()
         self._chb_fanjian = QCheckBox('繁→简转换')
         self._chb_fanjian.setToolTip('将繁体中文转换为简体中文')
@@ -544,7 +518,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
 
         # ---- 操作 ----
-        # 合并转换、按章节导出、提取图片、重置
         grp = QGroupBox('操作')
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
@@ -576,7 +549,6 @@ class MainWindow(QMainWindow):
         gl.addWidget(btn)
 
         layout.addWidget(grp)
-        layout.addStretch()
 
         self._tabs.addTab(tab, 'EPUB → TXT')
 
@@ -593,13 +565,13 @@ class MainWindow(QMainWindow):
         """
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setSpacing(4)
-        layout.setContentsMargins(2, 4, 2, 4)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         # ---- 源文件 ----
         grp = QGroupBox('源文件')
         gl = QVBoxLayout(grp)
-        gl.setSpacing(8)
+        gl.setSpacing(10)
 
         self._le_mobi = QLineEdit()
         self._le_mobi.setPlaceholderText('选择 MOBI 源文件…')
@@ -619,13 +591,13 @@ class MainWindow(QMainWindow):
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
 
-        gl.addStretch()
-
         btn = QPushButton('▶ 转换为 TXT')
         btn.setObjectName('btn_action')
         btn.setToolTip('将 MOBI 文件转换为 TXT')
         btn.clicked.connect(self._on_convert_mobi_to_txt)
         gl.addWidget(btn)
+
+        gl.addStretch()
 
         btn = QPushButton('↺ 重置')
         btn.setObjectName('btn_reset')
@@ -633,7 +605,6 @@ class MainWindow(QMainWindow):
         btn.clicked.connect(self._on_reset_tab3)
         gl.addWidget(btn)
         layout.addWidget(grp)
-        layout.addStretch()
 
         self._tabs.addTab(tab, 'MOBI → TXT')
 
