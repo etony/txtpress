@@ -835,3 +835,62 @@ def convert_mobi_to_txt(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     return txt_path
+
+
+def extract_mobi_metadata(mobi_path: Path) -> dict:
+    """
+    从 MOBI 文件中提取书籍元数据。
+
+    Args:
+        mobi_path: MOBI 文件路径
+
+    Returns:
+        包含书籍信息的字典，字段包括：
+        - title: 书名
+        - creator: 作者
+        - publisher: 出版商
+        - description: 描述
+        - isbn: ISBN
+        - language: 语言
+        - published: 出版日期
+        - subject: 主题
+        - cover_offset: 封面图片偏移量（用于提取封面）
+    """
+    metadata = {
+        'title': '',
+        'creator': '',
+        'publisher': '',
+        'description': '',
+        'isbn': '',
+        'language': '',
+        'published': '',
+        'subject': '',
+        'cover_offset': None
+    }
+    
+    try:
+        from mobi.mobi_sectioner import Sectionizer
+        from mobi.mobi_header import MobiHeader
+        
+        sect = Sectionizer(str(mobi_path))
+        mobi_header = MobiHeader(sect, 0)
+        exth_metadata = mobi_header.getMetaData()
+        
+        # 提取元数据字段
+        metadata['title'] = exth_metadata.get('Title', [''])[0]
+        metadata['creator'] = exth_metadata.get('Creator', [''])[0]
+        metadata['publisher'] = exth_metadata.get('Publisher', [''])[0]
+        metadata['description'] = exth_metadata.get('Description', [''])[0]
+        metadata['isbn'] = exth_metadata.get('ISBN', [''])[0]
+        metadata['language'] = exth_metadata.get('Language', [''])[0]
+        metadata['published'] = exth_metadata.get('Published', [''])[0]
+        metadata['subject'] = exth_metadata.get('Subject', [''])[0]
+        
+        # 提取封面偏移量
+        if 'CoverOffset' in exth_metadata:
+            metadata['cover_offset'] = int(exth_metadata['CoverOffset'][0])
+            
+    except Exception as e:
+        logger.error(f'提取 MOBI 元数据失败: {e}')
+    
+    return metadata

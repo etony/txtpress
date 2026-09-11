@@ -1,0 +1,117 @@
+<h2>MOBI->TXT 书籍信息显示布局方案</h2>
+<p class="subtitle">选择适合 tab3 的书籍信息显示布局</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>网格布局</h3>
+      <p>使用网格布局显示书籍信息字段，封面图片在右侧。适合显示较多字段，布局整齐。</p>
+      <div class="mockup">
+        <div class="mockup-header">书籍信息</div>
+        <div class="mockup-body">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;">
+            <div>
+              <div class="label">标题</div>
+              <div class="mock-input">百年孤独</div>
+            </div>
+            <div>
+              <div class="label">作者</div>
+              <div class="mock-input">加西亚·马尔克斯</div>
+            </div>
+            <div>
+              <div class="label">出版日期</div>
+              <div class="mock-input">1967</div>
+            </div>
+            <div>
+              <div class="label">语言</div>
+              <div class="mock-input">西班牙语</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <div class="label">描述</div>
+              <div class="mock-input" style="height: 60px;">《百年孤独》是哥伦比亚作家加西亚·马尔克斯创作的长篇小说...</div>
+            </div>
+          </div>
+          <div style="float: right; width: 120px; height: 160px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center;">
+            <div class="label">封面图片</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>表单布局</h3>
+      <p>使用垂直表单布局，封面图片在顶部。适合字段较少的情况，布局紧凑。</p>
+      <div class="mockup">
+        <div class="mockup-header">书籍信息</div>
+        <div class="mockup-body">
+          <div style="display: flex; gap: 20px; padding: 10px;">
+            <div style="flex: 1;">
+              <div style="width: 120px; height: 160px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+                <div class="label">封面图片</div>
+              </div>
+            </div>
+            <div style="flex: 2;">
+              <div style="margin-bottom: 10px;">
+                <div class="label">标题</div>
+                <div class="mock-input">百年孤独</div>
+              </div>
+              <div style="margin-bottom: 10px;">
+                <div class="label">作者</div>
+                <div class="mock-input">加西亚·马尔克斯</div>
+              </div>
+              <div style="margin-bottom: 10px;">
+                <div class="label">出版日期</div>
+                <div class="mock-input">1967</div>
+              </div>
+              <div style="margin-bottom: 10px;">
+                <div class="label">语言</div>
+                <div class="mock-input">西班牙语</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>卡片布局</h3>
+      <p>使用卡片式布局，封面图片在左侧，信息在右侧。视觉层次清晰，现代感强。</p>
+      <div class="mockup">
+        <div class="mockup-header">书籍信息</div>
+        <div class="mockup-body">
+          <div style="display: flex; gap: 20px; padding: 10px; border: 1px solid #eee; border-radius: 8px; margin: 10px;">
+            <div style="width: 120px; height: 160px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center;">
+              <div class="label">封面图片</div>
+            </div>
+            <div style="flex: 1;">
+              <h3 style="margin: 0 0 10px 0;">百年孤独</h3>
+              <div style="margin-bottom: 8px;">
+                <span class="label">作者：</span>加西亚·马尔克斯
+              </div>
+              <div style="margin-bottom: 8px;">
+                <span class="label">出版日期：</span>1967
+              </div>
+              <div style="margin-bottom: 8px;">
+                <span class="label">语言：</span>西班牙语
+              </div>
+              <div style="margin-bottom: 8px;">
+                <span class="label">出版商：</span>南海出版公司
+              </div>
+              <div style="margin-top: 10px;">
+                <div class="label">描述</div>
+                <div style="font-size: 0.9em; color: #666; margin-top: 5px;">《百年孤独》是哥伦比亚作家加西亚·马尔克斯创作的长篇小说...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

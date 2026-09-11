@@ -1,0 +1,73 @@
+<h2>设计部分 2：UI 布局</h2>
+<p class="subtitle">在 tab3 中添加书籍信息卡片布局</p>
+
+<div class="mockup">
+  <div class="mockup-header">UI 布局设计</div>
+  <div class="mockup-body">
+    <h3>布局结构</h3>
+    <div style="padding: 10px;">
+      <div style="border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+        <h4 style="margin-top: 0;">书籍信息组（新增）</h4>
+        <div style="display: flex; gap: 20px;">
+          <div style="width: 120px; height: 160px; background: #f0f0f0; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center;">
+            <div class="label">封面图片</div>
+          </div>
+          <div style="flex: 1;">
+            <div style="margin-bottom: 10px;">
+              <div class="label">标题</div>
+              <div class="mock-input">百年孤独</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div class="label">作者</div>
+              <div class="mock-input">加西亚·马尔克斯</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div class="label">出版日期</div>
+              <div class="mock-input">1967</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div class="label">语言</div>
+              <div class="mock-input">西班牙语</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div class="label">出版商</div>
+              <div class="mock-input">南海出版公司</div>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div class="label">ISBN</div>
+              <div class="mock-input">978-7-5442-4530-0</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          <div class="label">描述</div>
+          <div style="height: 60px; border: 1px solid #ccc; border-radius: 4px; padding: 5px; font-size: 0.9em;">
+            《百年孤独》是哥伦比亚作家加西亚·马尔克斯创作的长篇小说...
+          </div>
+        </div>
+      </div>
+
+      <div style="border: 1px solid #eee; border-radius: 8px; padding: 15px;">
+        <h4 style="margin-top: 0;">源文件组（现有）</h4>
+        <div style="margin-bottom: 10px;">
+          <div class="label">MOBI 文件:</div>
+          <div class="mock-input">/path/to/book.mobi</div>
+        </div>
+        <div>
+          <div class="label">TXT 保存:</div>
+          <div class="mock-input">/path/to/book.txt</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>交互逻辑</h3>
+    <div style="padding: 10px;">
+      <ul style="margin: 0; padding-left: 20px;">
+        <li>选择 MOBI 文件后自动提取并显示书籍信息</li>
+        <li>添加"刷新信息"按钮，支持手动重新提取</li>
+        <li>书籍信息字段可编辑，修改后影响转换结果</li>
+        <li>封面图片从 MOBI 文件中提取并显示</li>
+      </ul>
+    </div>
+  </div>
+</div>
