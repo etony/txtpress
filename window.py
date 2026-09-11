@@ -36,6 +36,7 @@ TxtPress — 电子书格式转换工具。主窗口，Tab 布局，绑定所有
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 import subprocess
@@ -44,14 +45,14 @@ import datetime
 from loguru import logger
 import chardet
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
     QPushButton, QPlainTextEdit, QCheckBox, QProgressBar,
     QFileDialog, QMessageBox, QApplication,
 )
-from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter
+from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter, QColor, QPen, QBrush
 from pathlib import Path
 from opencc import OpenCC
 
@@ -229,9 +230,11 @@ class MainWindow(QMainWindow):
         # ---- 主题切换按钮 ----
         self._theme_manager = theme_manager
         self._theme_manager.set_app(QApplication.instance())
-        self._theme_btn = QPushButton('🌙')
-        self._theme_btn.setFixedSize(30, 22)
+        self._theme_btn = QPushButton()
+        self._theme_btn.setFixedSize(28, 28)
         self._theme_btn.setToolTip('切换深色/浅色主题')
+        self._theme_btn.setIcon(self._create_theme_icon('light'))
+        self._theme_btn.setIconSize(QSize(18, 18))
         self._theme_btn.clicked.connect(self._toggle_theme)
         self.statusBar().addPermanentWidget(self._theme_btn)
         
@@ -1293,9 +1296,44 @@ class MainWindow(QMainWindow):
     def _toggle_theme(self):
         """切换深色/浅色主题"""
         self._theme_manager.toggle_theme()
-        self._theme_btn.setText(self._theme_manager.get_theme_icon())
-        # 保存主题设置
+        theme = 'dark' if self._theme_manager.get_current_theme().value == 'dark' else 'light'
+        self._theme_btn.setIcon(self._create_theme_icon(theme))
         self._save_config()
+
+    def _create_theme_icon(self, theme: str) -> QIcon:
+        """创建主题切换图标（太阳/月亮）"""
+        size = 18
+        pixmap = QPixmap(size, size)
+        pixmap.fill(QColor(0, 0, 0, 0))
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        if theme == 'light':
+            # 浅色主题 -> 显示月亮（点击切换到深色）
+            painter.setPen(QPen(QColor('#757575'), 1.5))
+            painter.setBrush(QBrush(QColor('#757575')))
+            painter.drawEllipse(3, 2, 10, 10)
+            painter.setPen(QPen(QColor(0, 0, 0, 0)))
+            painter.setBrush(QBrush(QColor(0, 0, 0, 0)))
+            painter.drawEllipse(6, 1, 10, 10)
+        else:
+            # 深色主题 -> 显示太阳（点击切换到浅色）
+            painter.setPen(QPen(QColor('#FFB300'), 1.5))
+            painter.setBrush(QBrush(QColor('#FFB300')))
+            painter.drawEllipse(5, 5, 8, 8)
+            pen = QPen(QColor('#FFB300'), 1.5)
+            painter.setPen(pen)
+            cx, cy = size // 2, size // 2
+            for angle in range(0, 360, 45):
+                rad = math.radians(angle)
+                x1 = cx + 6 * math.cos(rad)
+                y1 = cy + 6 * math.sin(rad)
+                x2 = cx + 8 * math.cos(rad)
+                y2 = cy + 8 * math.sin(rad)
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+
+        painter.end()
+        return QIcon(pixmap)
 
     def _on_regex_preset_changed(self, preset_name: str):
         """正则预设变更处理"""
@@ -1524,7 +1562,7 @@ class MainWindow(QMainWindow):
             from theme_manager import Theme
             theme = Theme.DARK if cfg.theme == 'dark' else Theme.LIGHT
             self._theme_manager.set_theme(theme)
-            self._theme_btn.setText(self._theme_manager.get_theme_icon())
+            self._theme_btn.setIcon(self._create_theme_icon(cfg.theme))
         # 正则预设
         if hasattr(cfg, 'regex_preset') and cfg.regex_preset:
             idx = self._cb_regex_preset.findText(cfg.regex_preset)
