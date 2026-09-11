@@ -1291,6 +1291,10 @@ class MainWindow(QMainWindow):
         d, fname = os.path.split(path)
         base, _ = os.path.splitext(fname)
         self._le_mobi_txt.setText(os.path.join(d, base + '.txt'))
+        
+        # 自动提取书籍信息
+        self._load_mobi_metadata(path)
+        
         self.statusBar().showMessage(f'已加载: {fname}')
 
     def _on_browse_mobi(self):
@@ -1326,10 +1330,12 @@ class MainWindow(QMainWindow):
             cover_data = extract_mobi_cover(Path(mobi_path), cover_offset)
             if cover_data:
                 pixmap = QPixmap()
-                pixmap.loadFromData(cover_data)
-                self._mobi_lbl_cover.setPixmap(pixmap.scaled(
-                    120, 160, Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation))
+                if pixmap.loadFromData(cover_data):
+                    self._mobi_lbl_cover.setPixmap(pixmap.scaled(
+                        120, 160, Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation))
+                else:
+                    self._mobi_lbl_cover.setText('封面加载失败')
             else:
                 self._mobi_lbl_cover.setText('无封面')
         else:
