@@ -1386,6 +1386,7 @@ class MainWindow(QMainWindow):
         self._mobi_book_published.clear()
         self._mobi_lbl_cover.clear()
         self._mobi_lbl_cover.setText('')
+        self.statusBar().showMessage('已重置')
         logger.info('tab3 重置')
 
     # ================================================================
