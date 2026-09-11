@@ -12,7 +12,7 @@ from typing import Optional
 from PyQt6.QtWidgets import QApplication
 from loguru import logger
 
-from constants import RES_DIR
+from constants import BASE_DIR
 
 
 class Theme(Enum):
@@ -84,7 +84,7 @@ class ThemeManager:
     def __init__(self):
         self._current_theme = Theme.LIGHT
         self._app: Optional[QApplication] = None
-        self._styles_dir = os.path.join(RES_DIR, '..', 'styles')
+        self._styles_dir = os.path.join(BASE_DIR, 'styles')
     
     def set_app(self, app: QApplication):
         """设置QApplication实例"""
@@ -106,7 +106,7 @@ class ThemeManager:
             logger.info('已切换到深色主题')
         else:
             # 尝试从文件加载浅色主题
-            qss_path = os.path.join(RES_DIR, '..', 'resources', 'theme.qss')
+            qss_path = os.path.join(BASE_DIR, 'resources', 'theme.qss')
             if os.path.exists(qss_path):
                 with open(qss_path, 'r', encoding='utf-8') as f:
                     self._app.setStyleSheet(f.read())
