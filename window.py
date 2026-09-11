@@ -293,60 +293,56 @@ class MainWindow(QMainWindow):
 
         # ---- 书籍信息 ----
         grp = QGroupBox('书籍信息')
-        gl = QGridLayout(grp)
+        gl = QHBoxLayout(grp)
         gl.setSpacing(10)
-        gl.setColumnStretch(1, 1)
-        gl.setColumnStretch(3, 1)
 
-        gl.addWidget(QLabel('书名:'), 0, 0)
-        self._le_title = QLineEdit()
-        self._le_title.setPlaceholderText('默认 = 文件名')
-        self._le_title.setAccessibleName('书名')
-        gl.addWidget(self._le_title, 0, 1)
-        gl.addWidget(QLabel('作者:'), 0, 2)
-        self._le_author = QLineEdit()
-        self._le_author.setPlaceholderText('默认 = 作者')
-        self._le_author.setAccessibleName('作者')
-        gl.addWidget(self._le_author, 0, 3)
-
-        gl.addWidget(QLabel('贡献者:'), 1, 0)
-        self._le_txt_contrib = QLineEdit()
-        self._le_txt_contrib.setPlaceholderText('默认 etony.an@gmail.com')
-        gl.addWidget(self._le_txt_contrib, 1, 1)
-        gl.addWidget(QLabel('日期:'), 1, 2)
-        self._le_txt_date = QLineEdit()
-        self._le_txt_date.setPlaceholderText('默认当前时间 (yyyy-mm-dd)')
-        gl.addWidget(self._le_txt_date, 1, 3)
-
-        gl.addWidget(QLabel('描述:'), 2, 0)
-        self._le_txt_desc = QLineEdit()
-        self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
-        gl.addWidget(self._le_txt_desc, 2, 1, 1, 3)
-
-        layout.addWidget(grp)
-
-        # ---- 封面 ----
-        grp_cover = QGroupBox('封面')
-        gc = QVBoxLayout(grp_cover)
-
-        cover_row = QHBoxLayout()
-        cover_row.addStretch()
+        # 封面图片（左侧）
         self._cover_label = _ClickableLabel()
         self._cover_label.setObjectName('cover_label')
         self._cover_label.setFixedSize(120, 168)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap)
         self._cover_label.clicked.connect(self._on_choose_cover)
-        cover_row.addWidget(self._cover_label)
+        gl.addWidget(self._cover_label)
+
+        # 信息字段（右侧）
+        info_layout = QGridLayout()
+        info_layout.setSpacing(8)
+
+        info_layout.addWidget(QLabel('书名:'), 0, 0)
+        self._le_title = QLineEdit()
+        self._le_title.setPlaceholderText('默认 = 文件名')
+        self._le_title.setAccessibleName('书名')
+        info_layout.addWidget(self._le_title, 0, 1)
+        info_layout.addWidget(QLabel('作者:'), 0, 2)
+        self._le_author = QLineEdit()
+        self._le_author.setPlaceholderText('默认 = 作者')
+        self._le_author.setAccessibleName('作者')
+        info_layout.addWidget(self._le_author, 0, 3)
+
+        info_layout.addWidget(QLabel('贡献者:'), 1, 0)
+        self._le_txt_contrib = QLineEdit()
+        self._le_txt_contrib.setPlaceholderText('默认 etony.an@gmail.com')
+        info_layout.addWidget(self._le_txt_contrib, 1, 1)
+        info_layout.addWidget(QLabel('日期:'), 1, 2)
+        self._le_txt_date = QLineEdit()
+        self._le_txt_date.setPlaceholderText('默认当前时间 (yyyy-mm-dd)')
+        info_layout.addWidget(self._le_txt_date, 1, 3)
+
+        info_layout.addWidget(QLabel('描述:'), 2, 0)
+        self._le_txt_desc = QLineEdit()
+        self._le_txt_desc.setPlaceholderText('EPUB 描述信息 (dc:description，可选)')
+        info_layout.addWidget(self._le_txt_desc, 2, 1, 1, 3)
+
+        # 选择封面按钮
         btn = QPushButton('选择封面')
         btn.setObjectName('btn_info')
         btn.setToolTip('选择 EPUB 封面图片')
         btn.clicked.connect(self._on_choose_cover)
-        cover_row.addWidget(btn)
-        cover_row.addStretch()
-        gc.addLayout(cover_row)
+        info_layout.addWidget(btn, 3, 0, 1, 4)
 
-        layout.addWidget(grp_cover)
+        gl.addLayout(info_layout)
+        layout.addWidget(grp)
 
         # ---- 高级选项 ----
         grp = QGroupBox('选项')
@@ -480,59 +476,58 @@ class MainWindow(QMainWindow):
 
         # ---- 书籍信息 ----
         grp = QGroupBox('书籍信息')
-        gl = QGridLayout(grp)
+        gl = QHBoxLayout(grp)
         gl.setSpacing(10)
-        gl.setColumnStretch(1, 1)
-        gl.setColumnStretch(3, 1)
 
-        gl.addWidget(QLabel('书名:'), 0, 0)
-        self._le_book_title = QLineEdit()
-        gl.addWidget(self._le_book_title, 0, 1)
-        gl.addWidget(QLabel('作者:'), 0, 2)
-        self._le_book_creator = QLineEdit()
-        gl.addWidget(self._le_book_creator, 0, 3)
-
-        gl.addWidget(QLabel('贡献者:'), 1, 0)
-        self._le_book_contrib = QLineEdit()
-        gl.addWidget(self._le_book_contrib, 1, 1)
-        gl.addWidget(QLabel('日期:'), 1, 2)
-        self._le_book_date = QLineEdit()
-        gl.addWidget(self._le_book_date, 1, 3)
-
-        gl.addWidget(QLabel('描述:'), 2, 0)
-        self._le_book_desc = QLineEdit()
-        self._le_book_desc.setPlaceholderText('EPUB 描述信息 (dc:description)')
-        gl.addWidget(self._le_book_desc, 2, 1, 1, 3)
-
-        layout.addWidget(grp)
-
-        # ---- 封面 ----
-        grp_cover = QGroupBox('封面')
-        gc = QVBoxLayout(grp_cover)
-
-        cover_row = QHBoxLayout()
-        cover_row.addStretch()
+        # 封面图片（左侧）
         self._cover_label2 = _ClickableLabel()
         self._cover_label2.setObjectName('cover_label')
         self._cover_label2.setFixedSize(120, 168)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label2.setPixmap(pixmap)
         self._cover_label2.clicked.connect(self._on_choose_cover2)
-        cover_row.addWidget(self._cover_label2)
+        gl.addWidget(self._cover_label2)
+
+        # 信息字段（右侧）
+        info_layout = QGridLayout()
+        info_layout.setSpacing(8)
+
+        info_layout.addWidget(QLabel('书名:'), 0, 0)
+        self._le_book_title = QLineEdit()
+        info_layout.addWidget(self._le_book_title, 0, 1)
+        info_layout.addWidget(QLabel('作者:'), 0, 2)
+        self._le_book_creator = QLineEdit()
+        info_layout.addWidget(self._le_book_creator, 0, 3)
+
+        info_layout.addWidget(QLabel('贡献者:'), 1, 0)
+        self._le_book_contrib = QLineEdit()
+        info_layout.addWidget(self._le_book_contrib, 1, 1)
+        info_layout.addWidget(QLabel('日期:'), 1, 2)
+        self._le_book_date = QLineEdit()
+        info_layout.addWidget(self._le_book_date, 1, 3)
+
+        info_layout.addWidget(QLabel('描述:'), 2, 0)
+        self._le_book_desc = QLineEdit()
+        self._le_book_desc.setPlaceholderText('EPUB 描述信息 (dc:description)')
+        info_layout.addWidget(self._le_book_desc, 2, 1, 1, 3)
+
+        # 按钮行
+        btn_layout = QHBoxLayout()
         btn = QPushButton('更换封面')
         btn.setObjectName('btn_info')
         btn.setToolTip('选择新封面图片')
         btn.clicked.connect(self._on_choose_cover2)
-        cover_row.addWidget(btn)
+        btn_layout.addWidget(btn)
         btn = QPushButton('保存元信息')
         btn.setObjectName('btn_secondary')
         btn.setToolTip('将当前编辑的元信息写回 EPUB 文件')
         btn.clicked.connect(self._on_save_metadata)
-        cover_row.addWidget(btn)
-        cover_row.addStretch()
-        gc.addLayout(cover_row)
+        btn_layout.addWidget(btn)
+        btn_layout.addStretch()
+        info_layout.addLayout(btn_layout, 3, 0, 1, 4)
 
-        layout.addWidget(grp_cover)
+        gl.addLayout(info_layout)
+        layout.addWidget(grp)
 
         # ---- 选项 ----
         grp = QGroupBox('选项')
