@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 | 文件 | 职责 |
 |------|------|
-| `window.py` | 主窗口 UI（最大文件，~1580 行） |
+| `window.py` | 主窗口 UI（最大文件，~1750 行） |
 | `services.py` | 核心转换逻辑，不依赖 PyQt |
 | `worker.py` | QThread 后台线程，连接 UI 与 services |
 | `models.py` | `BookInfo`/`AppConfig` dataclass |
@@ -55,3 +55,9 @@ pip install -r requirements.txt
 ## Workflow
 
 - 每次代码改动完成后自动 `git add -A && git commit`，提交信息用英文简述改动内容。
+
+## 重构记录
+
+- `_create_book_info_group()`：统一书籍信息组布局（封面 + 字段 + 按钮）
+- `_on_choose_cover_impl()`：封面选择通用实现
+- `_reset_cover()` / `_reset_status()`：重置辅助方法
