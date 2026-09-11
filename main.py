@@ -28,7 +28,7 @@ import os
 import sys
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QIcon
 
 from window import MainWindow
 
@@ -74,6 +74,11 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName('TxtPress')
     app.setOrganizationName('etony')
+    
+    # ---- 应用图标 ----
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', 'images', 'bookinfo.ico')
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     # ---- 全局字体 ----
     # Microsoft YaHei 是 Windows 上的中文字体，字号 10pt。
