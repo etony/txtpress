@@ -339,24 +339,21 @@ class MainWindow(QMainWindow):
         gl = QVBoxLayout(grp)
         gl.setSpacing(10)
 
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel('文件编码:'))
+        row = QHBoxLayout()
+        row.addWidget(QLabel('文件编码:'))
         self._cb_encode = QComboBox()
         self._cb_encode.addItems(
             ['自动检测', 'utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis'])
-        row1.addWidget(self._cb_encode)
-        row1.addStretch()
-        gl.addLayout(row1)
-
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel('章节正则:'))
+        row.addWidget(self._cb_encode)
+        row.addSpacing(12)
+        row.addWidget(QLabel('章节正则:'))
         self._te_reg = QPlainTextEdit()
         self._te_reg.setFixedHeight(60)
         self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
         self._te_reg.setPlainText(
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
-        row2.addWidget(self._te_reg)
-        gl.addLayout(row2)
+        row.addWidget(self._te_reg)
+        gl.addLayout(row)
 
         layout.addWidget(grp)
 
