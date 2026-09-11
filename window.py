@@ -657,6 +657,12 @@ class MainWindow(QMainWindow):
         info_layout.addWidget(QLabel('出版日期:'), 2, 2)
         info_layout.addWidget(self._mobi_book_published, 2, 3)
         
+        # 刷新按钮
+        btn_refresh = QPushButton('🔄 刷新信息')
+        btn_refresh.setToolTip('重新提取 MOBI 文件的书籍信息')
+        btn_refresh.clicked.connect(self._on_refresh_mobi_info)
+        info_layout.addWidget(btn_refresh, 3, 0, 1, 4)
+        
         gl.addLayout(info_layout)
         layout.addWidget(grp)
 
@@ -1328,6 +1334,14 @@ class MainWindow(QMainWindow):
                 self._mobi_lbl_cover.setText('无封面')
         else:
             self._mobi_lbl_cover.setText('无封面')
+
+    def _on_refresh_mobi_info(self):
+        """手动刷新 MOBI 文件的书籍信息"""
+        mobi_path = self._le_mobi.text().strip()
+        if not mobi_path or not os.path.exists(mobi_path):
+            QMessageBox.warning(self, '提示', '请先选择有效的 MOBI 文件')
+            return
+        self._load_mobi_metadata(mobi_path)
 
     def _on_browse_mobi_txt(self):
         """浏览——选择 TXT 保存路径。"""
