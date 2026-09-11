@@ -11,10 +11,9 @@ QMainWindow {
 QTabWidget::pane {
     border: none;
     background: #FFFFFF;
-    border-radius: 12px;
-    padding: 8px 12px;
-    margin: 4px 8px;
-    /* 卡片阴影效果 */
+    border-radius: 10px;
+    padding: 6px 8px;
+    margin: 4px 6px;
     border: 1px solid #E8E8E8;
 }
 QTabBar {
@@ -49,8 +48,8 @@ QGroupBox {
     color: #424242;
     border: 1px solid #E0E0E0;
     border-radius: 8px;
-    margin-top: 10px;
-    padding: 14px 10px 10px 10px;
+    margin-top: 8px;
+    padding: 12px 8px 8px 8px;
     background: #FFFFFF;
     border: 1px solid #E8E8E8;
 }
