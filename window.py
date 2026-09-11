@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
         self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
-        self.setMinimumSize(780, 560)
+        self.setMinimumSize(780, 440)
 
         # ---- 中央控件 ----
         # 整个窗口分为：Tab 标签页 + 底部状态栏
@@ -375,10 +375,9 @@ class MainWindow(QMainWindow):
 
         row2 = QHBoxLayout()
         row2.addWidget(QLabel('章节正则:'))
-        self._te_reg = QPlainTextEdit()
-        self._te_reg.setFixedHeight(60)
+        self._te_reg = QLineEdit()
         self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
-        self._te_reg.setPlainText(
+        self._te_reg.setText(
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
         row2.addWidget(self._te_reg)
         gl.addLayout(row2)
@@ -891,7 +890,7 @@ class MainWindow(QMainWindow):
             conv = Txt2Epub(txt, self._le_epub.text() or txt + '.epub')
             if self._cb_encode.currentIndex() != 0:
                 conv.encoding = self._cb_encode.currentText()
-            reg = self._te_reg.toPlainText().strip()
+            reg = self._te_reg.text().strip()
             if len(reg) >= _MIN_REGEX_LEN:
                 conv.regex = reg
             chapters = conv.get_chapters()
@@ -922,7 +921,7 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         self._cover_label.setPixmap(pixmap)
         self._cb_encode.setCurrentIndex(0)
-        self._te_reg.setPlainText(DEFAULT_CHAPTER_REGEX)
+        self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self.statusBar().showMessage('已重置')
         logger.info('tab1 重置')
@@ -965,7 +964,7 @@ class MainWindow(QMainWindow):
             conv.cover_path = self._txt_cover
         if self._cb_encode.currentIndex() != 0:
             conv.encoding = self._cb_encode.currentText()
-        reg = self._te_reg.toPlainText().strip()
+        reg = self._te_reg.text().strip()
         if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
         # 如果有自定义章节顺序，传给转换器
@@ -1475,7 +1474,7 @@ class MainWindow(QMainWindow):
         """正则预设变更处理"""
         regex = REGEX_PRESETS.get(preset_name, '')
         if regex:
-            self._te_reg.setPlainText(regex)
+            self._te_reg.setText(regex)
         # 如果是"自定义"，清空让用户输入
         if preset_name == '自定义（用户输入）':
             self._te_reg.clear()
@@ -1654,7 +1653,7 @@ class MainWindow(QMainWindow):
             txt_encoding=self._cb_encode.currentIndex(),
             out_encoding=self._cb_out_code.currentText(),
             chapter_sep=self._cb_sep.currentText(),
-            chapter_regex=self._te_reg.toPlainText().strip(),
+            chapter_regex=self._te_reg.text().strip(),
             fanjian_enabled=self._chb_fanjian.isChecked(),
             window_geometry=bytes(self.saveGeometry()),
             theme=self._theme_manager.get_current_theme().value,
@@ -1685,7 +1684,7 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._cb_sep.setCurrentIndex(idx)
         # 正则
-        self._te_reg.setPlainText(
+        self._te_reg.setText(
             cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # 繁简
         self._chb_fanjian.setChecked(cfg.fanjian_enabled)
