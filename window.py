@@ -392,6 +392,7 @@ class MainWindow(QMainWindow):
         gl.addWidget(btn)
 
         layout.addWidget(grp)
+        layout.addStretch()
 
         self._tabs.addTab(tab, 'TXT → EPUB')
 
@@ -549,6 +550,7 @@ class MainWindow(QMainWindow):
         gl.addWidget(btn)
 
         layout.addWidget(grp)
+        layout.addStretch()
 
         self._tabs.addTab(tab, 'EPUB → TXT')
 
@@ -605,6 +607,7 @@ class MainWindow(QMainWindow):
         btn.clicked.connect(self._on_reset_tab3)
         gl.addWidget(btn)
         layout.addWidget(grp)
+        layout.addStretch()
 
         self._tabs.addTab(tab, 'MOBI → TXT')
 
