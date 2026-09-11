@@ -79,6 +79,12 @@ def main():
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', 'images', 'bookinfo.ico')
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
+        # Windows 任务栏图标
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('TxtPress.EbookConverter')
+        except Exception:
+            pass
 
     # ---- 全局字体 ----
     # Microsoft YaHei 是 Windows 上的中文字体，字号 10pt。
