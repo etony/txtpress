@@ -145,9 +145,9 @@ QPlainTextEdit:focus {
 
 /* --- QPushButton --- */
 QPushButton {
-    background-color: #1976D2;
-    color: #FFFFFF;
-    border: none;
+    background-color: #E3F2FD;
+    color: #1976D2;
+    border: 1px solid #BBDEFB;
     border-radius: 4px;
     padding: 6px 16px;
     font-size: 12px;
@@ -155,30 +155,38 @@ QPushButton {
     min-height: 18px;
 }
 QPushButton:hover {
-    background-color: #1565C0;
+    background-color: #BBDEFB;
+    border-color: #90CAF9;
 }
 QPushButton:pressed {
-    background-color: #0D47A1;
+    background-color: #90CAF9;
+    color: #0D47A1;
 }
 QPushButton:disabled {
-    background-color: #E0E0E0;
-    color: #9E9E9E;
+    background-color: #F5F5F5;
+    color: #BDBDBD;
+    border: 1px solid #E0E0E0;
 }
 QPushButton:focus {
     outline: none;
-    border: 1px solid #1976D2;
+    border: 1px solid #64B5F6;
 }
 QPushButton#btn_browse {
-    background-color: #78909C;
+    background-color: #F5F5F5;
+    color: #616161;
+    border: 1px solid #E0E0E0;
     padding: 4px 10px;
     font-size: 11px;
     border-radius: 4px;
 }
 QPushButton#btn_browse:hover {
-    background-color: #607D8B;
+    background-color: #EEEEEE;
+    border-color: #BDBDBD;
 }
 QPushButton#btn_action {
     background-color: #1976D2;
+    color: #FFFFFF;
+    border: none;
     padding: 8px 22px;
     font-size: 13px;
     font-weight: 600;
@@ -193,28 +201,31 @@ QPushButton#btn_action:pressed {
 QPushButton#btn_reset {
     background-color: transparent;
     color: #757575;
-    border: 1px solid #BDBDBD;
+    border: 1px solid #E0E0E0;
     border-radius: 4px;
 }
 QPushButton#btn_reset:hover {
     background-color: #F5F5F5;
-    border-color: #9E9E9E;
+    border-color: #BDBDBD;
 }
 QPushButton#btn_info {
-    background-color: #42A5F5;
-    border-radius: 4px;
-}
-QPushButton#btn_info:hover {
-    background-color: #1E88E5;
-}
-QPushButton#btn_secondary {
     background-color: #E3F2FD;
     color: #1976D2;
     border: 1px solid #BBDEFB;
     border-radius: 4px;
 }
-QPushButton#btn_secondary:hover {
+QPushButton#btn_info:hover {
     background-color: #BBDEFB;
+}
+QPushButton#btn_secondary {
+    background-color: #F5F5F5;
+    color: #616161;
+    border: 1px solid #E0E0E0;
+    border-radius: 4px;
+}
+QPushButton#btn_secondary:hover {
+    background-color: #EEEEEE;
+    border-color: #BDBDBD;
 }
 
 /* --- QProgressBar --- */
