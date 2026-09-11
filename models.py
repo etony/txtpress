@@ -100,6 +100,12 @@ class AppConfig:
         # 兼容旧配置：txt_encoding 从字符串迁移为 int
         if isinstance(filtered.get('txt_encoding'), str):
             filtered['txt_encoding'] = 0
+        # hex 字符串还原为 bytes
+        if isinstance(filtered.get('window_geometry'), str):
+            try:
+                filtered['window_geometry'] = bytes.fromhex(filtered['window_geometry'])
+            except ValueError:
+                filtered['window_geometry'] = None
         return cls(**filtered)
 
     def save(self, path: str | Path) -> None:
@@ -111,7 +117,11 @@ class AppConfig:
         indent=2 让 JSON 文件可读性更好，方便手动查看和调试。
         """
         try:
+            data = asdict(self)
+            # bytes 类型不能直接 JSON 序列化，转为 hex 字符串
+            if isinstance(data.get('window_geometry'), bytes):
+                data['window_geometry'] = data['window_geometry'].hex()
             with open(path, 'w', encoding='utf-8') as f:
-                json.dump(asdict(self), f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=2)
         except (IOError, OSError) as e:
             print(f'[TxtPress] 配置保存失败: {e}', file=sys.stderr)
