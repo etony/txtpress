@@ -1378,7 +1378,14 @@ class MainWindow(QMainWindow):
         """重置 tab3 的所有输入。"""
         self._le_mobi.clear()
         self._le_mobi_txt.clear()
-        self.statusBar().showMessage('已重置')
+        self._mobi_book_title.clear()
+        self._mobi_book_author.clear()
+        self._mobi_book_publisher.clear()
+        self._mobi_book_isbn.clear()
+        self._mobi_book_language.clear()
+        self._mobi_book_published.clear()
+        self._mobi_lbl_cover.clear()
+        self._mobi_lbl_cover.setText('')
         logger.info('tab3 重置')
 
     # ================================================================
