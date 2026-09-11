@@ -60,7 +60,7 @@ from models import AppConfig, BookInfo
 from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
-from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS
+from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS, FONT_PRESETS, TOC_STYLES
 from theme_manager import theme_manager, Theme
 
 
@@ -386,6 +386,21 @@ class MainWindow(QMainWindow):
             self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
         row2.addWidget(self._te_reg)
         gl.addLayout(row2)
+
+        # 字体和目录样式
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel('正文字体:'))
+        self._cb_font = QComboBox()
+        self._cb_font.addItems(list(FONT_PRESETS.keys()))
+        row3.addWidget(self._cb_font)
+        row3.addSpacing(12)
+        
+        row3.addWidget(QLabel('目录样式:'))
+        self._cb_toc_style = QComboBox()
+        self._cb_toc_style.addItems(list(TOC_STYLES.keys()))
+        row3.addWidget(self._cb_toc_style)
+        row3.addStretch()
+        gl.addLayout(row3)
 
         layout.addWidget(grp)
 
@@ -911,6 +926,24 @@ class MainWindow(QMainWindow):
         css_path = os.path.join(STYLES_DIR, f'{style_name}.css')
         if os.path.exists(css_path):
             conv.load_css_from_file(css_path)
+        
+        # 应用字体设置
+        font_name = self._cb_font.currentText()
+        if font_name in FONT_PRESETS:
+            font_css = FONT_PRESETS[font_name]
+            conv.css_style = conv.css_style.replace(
+                'font-family: Cambria, "Liberation Serif", Georgia, "Times New Roman", serif;',
+                f'font-family: {font_css};'
+            )
+        
+        # 应用目录样式
+        toc_style_name = self._cb_toc_style.currentText()
+        if toc_style_name in TOC_STYLES:
+            toc_marker = TOC_STYLES[toc_style_name]
+            conv.css_style = conv.css_style.replace(
+                'list-style-type: square;',
+                f'list-style-type: {toc_marker};'
+            )
 
         self._run_worker(
             target=conv.convert,
@@ -1523,6 +1556,8 @@ class MainWindow(QMainWindow):
             theme=self._theme_manager.get_current_theme().value,
             regex_preset=self._cb_regex_preset.currentText(),
             epub_style=self._cb_epub_style.currentText(),
+            font_family=self._cb_font.currentText(),
+            toc_style=self._cb_toc_style.currentText(),
         )
         self._config.save(CONFIG_PATH)
 
@@ -1572,6 +1607,16 @@ class MainWindow(QMainWindow):
             idx = self._cb_epub_style.findText(cfg.epub_style)
             if idx >= 0:
                 self._cb_epub_style.setCurrentIndex(idx)
+        # 字体
+        if hasattr(cfg, 'font_family') and cfg.font_family:
+            idx = self._cb_font.findText(cfg.font_family)
+            if idx >= 0:
+                self._cb_font.setCurrentIndex(idx)
+        # 目录样式
+        if hasattr(cfg, 'toc_style') and cfg.toc_style:
+            idx = self._cb_toc_style.findText(cfg.toc_style)
+            if idx >= 0:
+                self._cb_toc_style.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         """窗口关闭时自动保存配置。

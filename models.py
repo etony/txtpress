@@ -67,6 +67,8 @@ class AppConfig:
     theme: str = 'light'           # 主题设置（light/dark）
     regex_preset: str = '中文标准（第X章）'  # 正则预设名称
     epub_style: str = 'default'    # EPUB样式名称
+    font_family: str = '宋体'      # EPUB正文字体
+    toc_style: str = '默认'        # 目录样式
 
     @classmethod
     def load(cls, path: str | Path) -> AppConfig:

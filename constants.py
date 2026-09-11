@@ -32,3 +32,24 @@ REGEX_PRESETS = {
     '卷+章': r'^\s*(卷[一二三四五六七八九十\d]+.*)\s*$',
     '自定义（用户输入）': '',
 }
+
+# ---- EPUB 字体预设 ----
+FONT_PRESETS = {
+    '宋体': 'SimSun, "Song Ti", serif',
+    '黑体': 'SimHei, "Hei Ti", sans-serif',
+    '微软雅黑': '"Microsoft YaHei", sans-serif',
+    '楷体': 'KaiTi, "Kai Ti", serif',
+    '仿宋': 'FangSong, "Fang Song", serif',
+    '思源宋体': '"Source Han Serif SC", "Noto Serif CJK SC", serif',
+    '思源黑体': '"Source Han Sans SC", "Noto Sans CJK SC", sans-serif',
+    '霞鹜文楷': '"LXGW WenKai", serif',
+}
+
+# ---- 目录样式预设 ----
+TOC_STYLES = {
+    '默认': 'square',
+    '圆点': 'disc',
+    '圆圈': 'circle',
+    '无标记': 'none',
+    '数字': 'decimal',
+}
