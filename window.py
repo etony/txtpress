@@ -61,7 +61,6 @@ from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
 from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS
-from error_handler import show_error, show_warning, show_info
 from theme_manager import theme_manager, Theme
 
 
