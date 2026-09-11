@@ -94,8 +94,15 @@ class _ClickableLabel(QWidget):
         if self._pixmap and not self._pixmap.isNull():
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            target = self.rect()
-            painter.drawPixmap(target, self._pixmap)
+            # 保持宽高比缩放图片，居中显示
+            scaled = self._pixmap.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
 
     def mousePressEvent(self, event):
         self.clicked.emit()
