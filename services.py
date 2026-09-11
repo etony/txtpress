@@ -894,3 +894,25 @@ def extract_mobi_metadata(mobi_path: Path) -> dict:
         logger.error(f'提取 MOBI 元数据失败: {e}')
     
     return metadata
+
+
+def extract_mobi_cover(mobi_path: Path, cover_offset: int) -> Optional[bytes]:
+    """
+    从 MOBI 文件中提取封面图片。
+
+    Args:
+        mobi_path: MOBI 文件路径
+        cover_offset: 封面图片偏移量
+
+    Returns:
+        封面图片的二进制数据，如果提取失败返回 None
+    """
+    try:
+        from mobi.mobi_sectioner import Sectionizer
+        
+        sect = Sectionizer(str(mobi_path))
+        cover_data = sect.loadSection(cover_offset)
+        return cover_data
+    except Exception as e:
+        logger.error(f'提取 MOBI 封面失败: {e}')
+        return None
