@@ -101,6 +101,9 @@ def test_spine_without_cover(sample_txt, tmp_path):
     with zipfile.ZipFile(str(out)) as z:
         opf = z.read('EPUB/content.opf').decode('utf-8')
     assert 'idref="cover"' not in opf
+    # spine 不能退化为全空（同样非法），章节必须仍在阅读顺序中
+    assert 'idref="chapter_0"' in opf
+    assert opf.count('<itemref') >= 2
 
 
 def test_spine_with_cover(sample_txt, tmp_path):
@@ -133,6 +136,23 @@ def test_progress_completes(sample_txt, tmp_path):
     conv.convert(progress=lambda c, t: calls.append((c, t)))
     assert calls
     assert calls[-1][0] == calls[-1][1]
+
+
+def test_progress_completes_without_preamble(tmp_path):
+    """无序章时 done=0 分支，最后一次进度也应达到 total/total。"""
+    from services import Txt2Epub
+    txt = tmp_path / 'no_preamble.txt'
+    txt.write_text(
+        '第一章 开始\n内容甲。\n第二章 继续\n内容乙。\n',
+        encoding='utf-8',
+    )
+    conv = Txt2Epub(str(txt), str(tmp_path / 'prog_no_pa.epub'))
+    conv.cover_path = str(tmp_path / 'missing.jpg')
+    calls = []
+    conv.convert(progress=lambda c, t: calls.append((c, t)))
+    assert calls
+    assert calls[-1][0] == calls[-1][1]
+    assert calls[-1][1] == 2  # 无序章 total = 章节数
 
 
 def test_make_epub_variants(make_epub):
