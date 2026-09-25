@@ -2641,6 +2641,14 @@ python -m ruff check .          # Task 21 后清零
 git log --oneline               # 每任务一条英文提交
 ```
 
+## 已知遗留问题（评审发现，不阻塞本计划）
+
+| 问题 | 来源 | 状态 |
+|------|------|------|
+| nav/ncx 的章节 href 未做 URI 编码（含空格，epubcheck 报错） | Task 4 评审发现的既有缺陷 | 未排期，待用户决定是否追加任务 |
+| navPoint id 全为 'intro'（ID 重复，epubcheck 报错） | 同上（既有章节 toc 复制模式） | 未排期 |
+| `convert()` 末章后也追加分隔符（整文件以 `---` 收尾） | Task 2 评审 Minor 5 | 留给 Task 23 评估 |
+
 ## 完成定义
 
 - 23 个任务全部勾选，pytest 全绿，ruff 清零。
