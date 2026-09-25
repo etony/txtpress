@@ -21,6 +21,48 @@ def test_convert_creates_epub(sample_txt, tmp_path):
         assert z.testzip() is None
 
 
+def test_html_escaping(tmp_path):
+    """正文中的 <、>、& 必须被转义，不能当成标签。"""
+    from services import Txt2Epub
+    txt = tmp_path / 'x.txt'
+    txt.write_text(
+        '第1章 前<后\n正文<b>加粗</b>与&符号\n',
+        encoding='utf-8',
+    )
+    out = str(tmp_path / 'x.epub')
+    conv = Txt2Epub(str(txt), out)
+    conv.cover_path = str(tmp_path / 'missing.jpg')
+    conv.convert()
+
+    with zipfile.ZipFile(out) as z:
+        joined = b''.join(
+            z.read(n) for n in z.namelist() if n.endswith('.xhtml')
+        ).decode('utf-8')
+    assert '<b>加粗</b>' not in joined
+    assert '&lt;' in joined
+
+
+def test_paragraph_split(tmp_path):
+    """空行应拆分成独立 <p> 段落。"""
+    from services import Txt2Epub
+    txt = tmp_path / 'p.txt'
+    txt.write_text(
+        '第一章 标题\n第一段。\n\n第二段。\n',
+        encoding='utf-8',
+    )
+    out = str(tmp_path / 'p.epub')
+    conv = Txt2Epub(str(txt), out)
+    conv.cover_path = str(tmp_path / 'missing.jpg')
+    conv.convert()
+
+    with zipfile.ZipFile(out) as z:
+        joined = b''.join(
+            z.read(n) for n in z.namelist() if n.endswith('.xhtml')
+        ).decode('utf-8')
+    assert '<p>第一段。</p>' in joined
+    assert '<p>第二段。</p>' in joined
+
+
 def test_make_epub_variants(make_epub):
     """fixture 三种参数组合均能生成并回读 EPUB。"""
     from ebooklib import epub

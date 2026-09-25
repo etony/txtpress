@@ -22,6 +22,7 @@ TxtPress — 核心业务层，TXT ↔ EPUB ↔ MOBI 格式转换。
 
 from __future__ import annotations
 
+import html
 import os
 import re
 import uuid
@@ -99,6 +100,21 @@ ol > li:first-child { margin-top: 0.3em; }
 nav[epub|type~='toc'] > ol > li > ol { list-style-type: square; }
 nav[epub|type~='toc'] > ol > li > ol > li { margin-top: 0.3em; }
 '''
+
+
+def _text_to_html(text: str) -> str:
+    """把纯文本转成安全 HTML。
+
+    1. html.escape 转义 <、>、&，防止正文字符被当成标签解析
+    2. 按空行（连续换行）拆分成多个 <p> 段落，段内换行转 <br>
+    """
+    text = html.escape(text.replace(chr(160), ' '), quote=False)
+    paragraphs = re.split(r'\n\s*\n+', text)
+    return ''.join(
+        f'<p>{p.strip().replace(chr(10), "<br>")}</p>'
+        for p in paragraphs
+        if p.strip()
+    )
 
 
 # =====================================================================
@@ -299,15 +315,16 @@ class Txt2Epub:
 
         # ---- 序章 ----
         # splits[0] 是第一个标题之前的所有文本（没有标题的部分）
-        # 如果长度 > 5 个字符，就生成一个独立的序章章节
-        preamble = splits[0].replace('\n', '<br>').replace(chr(160), '')
-        total = len(chapters) + 1  # 章节数 + 序章
+        # 长度按原始文本判断（转义后长度会变化，不能用于判断）
+        raw_preamble = splits[0]
+        has_preamble = len(raw_preamble.strip()) > _MIN_PREAMBLE_LEN
+        total = len(chapters) + (1 if has_preamble else 0)
 
-        if len(preamble) > _MIN_PREAMBLE_LEN:
+        if has_preamble:
             if status:
                 status('正在生成序章…')
             ch = epub.EpubHtml(title='xu', file_name='xu.xhtml', lang='zh')
-            ch.content = f'<p>{preamble}</p>'
+            ch.content = _text_to_html(raw_preamble)
             ch.add_item(nav_css)
             book.add_item(ch)
             book.spine.append(ch)
@@ -320,7 +337,7 @@ class Txt2Epub:
             if progress:
                 progress(idx, total)
 
-            body = body.replace('\n', '<br>').replace(chr(160), '')
+            body_html = _text_to_html(body)
             # 将标题中的特殊字符替换为下划线，生成合法的文件名
             safe_name = re.sub(r'[\\/:*?"<>|]', '_', title.strip())[:_MAX_FILENAME_LEN]
             # 处理同名冲突：如果两个章节标题相同，加数字后缀区分
@@ -335,7 +352,9 @@ class Txt2Epub:
                 file_name=f'{safe_name}.xhtml',
                 lang='zh',
             )
-            ch.content = f'<h2>{title.strip()}</h2><p>{body}</p>'
+            ch.content = (
+                f'<h2>{html.escape(title.strip(), quote=False)}</h2>{body_html}'
+            )
             ch.add_item(nav_css)
 
             book.add_item(ch)
