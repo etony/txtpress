@@ -40,7 +40,7 @@ class ChapterDialog(QDialog):
     与 Txt2Epub 的交互：
     1. 主窗口解析 TXT 得到章节列表
     2. 打开此对话框让用户调整
-    3. 用户点"确定"后，主窗口通过 get_ordered_chapters() 获取新顺序
+    3. 用户点"确定"后，主窗口通过 get_ordered_items() 获取 [(原始索引, 新标题), ...]
     4. 主窗口调用 conv.set_chapter_order() 传入新顺序
     5. 转换时按这个新顺序生成 EPUB 章节
 
@@ -81,8 +81,10 @@ class ChapterDialog(QDialog):
         self._list = QListWidget()
         self._list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self._list.setDefaultDropAction(Qt.DropAction.MoveAction)
-        for ch in chapters:
+        for i, ch in enumerate(chapters):
             item = QListWidgetItem(ch)
+            # 存原始索引：拖拽/重命名都不会丢失"这是第几章"的信息
+            item.setData(Qt.ItemDataRole.UserRole, i)
             # ItemIsEditable 让用户可以双击编辑标题
             # flags 是 bitmask，用 | 组合多个 flag
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
@@ -105,19 +107,19 @@ class ChapterDialog(QDialog):
         h.addStretch()
         layout.addLayout(h)
 
-    def get_ordered_chapters(self) -> list[str]:
+    def get_ordered_items(self) -> list[tuple[int, str]]:
         """
-        获取排序后的章节列表。
+        获取排序后的章节列表：[(原始索引, 新标题), ...]。
 
-        如果用户拖拽调整了顺序，这个列表会反映新的顺序。
-        如果用户双击修改了标题，也返回修改后的标题。
-
-        在调用之前确保对话框已关闭且用户点击了"确定"。
-
-        Returns:
-            按当前列表顺序排列的章节标题（strip 去除首尾空白）
+        InternalMove 拖拽会连同 UserRole 数据一起移动，
+        双击重命名只改显示文本，原始索引保持不变。
+        调用前确保对话框已关闭且用户点了"确定"。
         """
-        return [self._list.item(i).text().strip() for i in range(self._list.count())]
+        return [
+            (self._list.item(i).data(Qt.ItemDataRole.UserRole),
+             self._list.item(i).text().strip())
+            for i in range(self._list.count())
+        ]
 
 
 class AboutDialog(QDialog):

@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
         self._epub_dir = ''                        # 当前 EPUB 文件所在目录
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
-        self._ordered_chapters: list[str] | None = None  # 用户通过 ChapterDialog 调整后的章节顺序
+        self._ordered_chapters: list[tuple[int, str]] | None = None  # ChapterDialog 调整后的章节 [(原始索引, 新标题)]
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
 
         # ---- 窗口基础 ----
@@ -937,11 +937,12 @@ class MainWindow(QMainWindow):
             dlg = ChapterDialog(chapters, self)
             # exec() 返回 QDialog.Accepted（确定）或 Rejected（关闭）
             if dlg.exec():
-                ordered = dlg.get_ordered_chapters()
-                if ordered != chapters:
-                    self._ordered_chapters = ordered
+                items = dlg.get_ordered_items()
+                original = [(i, t) for i, t in enumerate(chapters)]
+                if items != original:
+                    self._ordered_chapters = items
                     self.statusBar().showMessage(
-                        f'章节顺序已调整（{len(ordered)} 章）')
+                        f'章节顺序已调整（{len(items)} 章）')
                 else:
                     self._ordered_chapters = None
         except Exception as e:

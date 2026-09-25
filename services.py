@@ -168,7 +168,7 @@ class Txt2Epub:
         self._cached_path: str = ''                               # 上次解析时的文件路径（用于缓存失效）
         self._cached_encoding: str = ''                           # 上次解析时的编码（用于缓存失效）
         self._cached_regex: str = ''                              # 上次解析时的正则（用于缓存失效）
-        self._chapter_order: Optional[list[str]] = None           # 自定义章节顺序（由 ChapterDialog 设置）
+        self._chapter_order: Optional[list[tuple[int, str]]] = None   # 自定义章节顺序 [(原始索引, 新标题)]
 
     def load_css_from_file(self, css_path: str):
         """从文件加载自定义CSS样式"""
@@ -176,10 +176,11 @@ class Txt2Epub:
             with open(css_path, 'r', encoding='utf-8') as f:
                 self.css_style = f.read()
 
-    def set_chapter_order(self, ordered: list[str] | None) -> None:
-        """设置自定义章节顺序（由 ChapterDialog 拖拽调整后传入）。
+    def set_chapter_order(self, ordered: list[tuple[int, str]] | None) -> None:
+        """设置自定义章节顺序：[(原始索引, 新标题), ...]。
 
-        如果传 None，则按原始文件顺序。"""
+        用索引而不是标题匹配：重命名后的标题查不到原章，
+        重复标题也会互相覆盖。传 None 表示按原始文件顺序。"""
         self._chapter_order = ordered
 
     def _parse(self):
@@ -302,18 +303,21 @@ class Txt2Epub:
                      for i in range(1, len(splits) - 1, 2)]
 
         # ---- 应用自定义章节顺序 ----
-        # 如果用户在 ChapterDialog 中拖拽调整了顺序，这里起作用
+        # 按 (原始索引, 新标题) 重排：索引避免重命名查不到、重复标题覆盖
         if self._chapter_order:
-            # 用标题作为唯一标识，从原章节列表中查找匹配
-            # 先用字典建立标题→(标题,正文)的映射
-            lookup = {t.strip(): (t, b) for t, b in chapters}
-            ordered = []
-            for t in self._chapter_order:
-                tt = t.strip()
-                if tt in lookup:
-                    ordered.append(lookup[tt])
-            if ordered:
-                chapters = ordered
+            reordered = []
+            used: set[int] = set()
+            for idx, new_title in self._chapter_order:
+                if 0 <= idx < len(chapters) and idx not in used:
+                    _, body = chapters[idx]
+                    reordered.append((new_title, body))
+                    used.add(idx)
+            # 未出现在列表中的章节按原序补到末尾（防止丢章）
+            for i, pair in enumerate(chapters):
+                if i not in used:
+                    reordered.append(pair)
+            if reordered:
+                chapters = reordered
 
         # ---- 序章 ----
         # splits[0] 是第一个标题之前的所有文本（没有标题的部分）

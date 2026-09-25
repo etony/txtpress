@@ -139,7 +139,7 @@ txtpress/
 
 | 类 | 用途 |
 |---|---|
-| `ChapterDialog` | 章节目录预览，QListWidget 支持拖拽排序和双击重命名，`get_ordered_chapters()` 返回排序结果 |
+| `ChapterDialog` | 章节目录预览，QListWidget 支持拖拽排序和双击重命名，`get_ordered_items()` 返回 `[(原始索引, 新标题), ...]` |
 | `AboutDialog` | 关于弹窗，显示版本号、技术栈和作者信息 |
 
 ### constants.py — 全局常量
