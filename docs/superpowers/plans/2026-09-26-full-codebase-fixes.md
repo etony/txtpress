@@ -498,7 +498,9 @@ Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_c
 
 - [ ] **Step 6: 逐章进度计入序章偏移**
 
-将循环开头：
+**（status 分母 `{idx}/{total-1}` → `{idx}/{len(chapters)}` 已在 Task 3 评审修复中提前完成，跳过该部分。）**
+
+将循环开头（如仍存在旧 status 行）：
 
 ```python
         for idx, (title, body) in enumerate(chapters, start=1):
