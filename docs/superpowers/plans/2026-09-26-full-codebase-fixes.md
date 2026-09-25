@@ -229,6 +229,8 @@ Expected: FAIL（`len(set(texts)) == 4` 实际为 1）
 
 说明：window 侧（`window.py` `_run_epub_to_txt`）`if sep and sep != '（无）': reader.sep = sep.replace('\\n', '\n')` 已正确，无需改动。语义：基线每章以单个 `\n` 结尾，选项在基线之上追加额外分隔（`'\n'`→空行、`'\n\n'`→两个空行、`'\n---\n'`→分割线）。
 
+**评审补丁（已执行）:** `_process_document` 为 `convert()`/`convert_chapter()` 共用路径，按章节导出每文件只有一章，"章节间分隔符"不适用。`convert_chapter()` 内暂存 `self.sep` 置空、`try/finally` 恢复，忽略分隔符；`convert()` 行为不变。新增测试 `test_convert_chapter_ignores_sep`。
+
 - [ ] **Step 4: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
