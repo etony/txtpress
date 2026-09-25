@@ -39,7 +39,10 @@ def make_epub(tmp_path):
         book.set_title('测试书')
         book.set_language('zh')
         items = []
-        for i, (t, body) in enumerate(chapters or [('第一章', '甲'), ('第二章', '乙')], 1):
+        default_chapters = [('第一章', '甲'), ('第二章', '乙')]
+        for i, (t, body) in enumerate(
+            chapters if chapters is not None else default_chapters, 1
+        ):
             ch = epub.EpubHtml(title=t, file_name=f'ch{i}.xhtml', lang='zh')
             ch.content = f'<h2>{t}</h2><p>{body}</p>'
             book.add_item(ch)
@@ -50,10 +53,14 @@ def make_epub(tmp_path):
                 media_type='image/png', content=f'PNG{j}'.encode(),
             ))
         book.toc = tuple(items)
+        # 封面必须在 Ncx/Nav 之前注册：ebooklib 生成 nav 时会 parse 所有
+        # ITEM_DOCUMENT，而 EpubCoverHtml 的 content 是惰性生成的，
+        # 排在 nav 之后会导致 ParserError: Document is empty
+        if with_cover:
+            book.set_cover('cover.jpeg', b'\xff\xd8\xff\xe0fake')
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
         if with_cover:
-            book.set_cover('cover.jpeg', b'\xff\xd8\xff\xe0fake')
             book.spine = ['cover'] + items
         else:
             book.spine = list(items)
