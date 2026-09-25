@@ -103,11 +103,15 @@ def make_epub(tmp_path):
                 uid=f'img{j}', file_name=img_name,
                 media_type='image/png', content=f'PNG{j}'.encode(),
             ))
+        # 注意：set_cover 必须在 add_item(Ncx/Nav) 之前，
+        # 否则 cover.xhtml 排在 nav.xhtml 之后，ebooklib 生成 nav
+        # 时会 parse 空的 cover 文档抛 ParserError: Document is empty
+        if with_cover:
+            book.set_cover('cover.jpeg', b'\xff\xd8\xff\xe0fake')
         book.toc = tuple(items)
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
         if with_cover:
-            book.set_cover('cover.jpeg', b'\xff\xd8\xff\xe0fake')
             book.spine = ['cover'] + items
         else:
             book.spine = list(items)
