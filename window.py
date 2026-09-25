@@ -671,9 +671,12 @@ class MainWindow(QMainWindow):
         
         # 封面图片
         self._mobi_lbl_cover = QLabel()
-        self._mobi_lbl_cover.setFixedSize(120, 160)
+        self._mobi_lbl_cover.setFixedSize(120, 168)
+        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
+        self._mobi_lbl_cover.setPixmap(pixmap)        
         self._mobi_lbl_cover.setStyleSheet('border: 1px solid #ccc;')
         self._mobi_lbl_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._mobi_lbl_cover.setScaledContents(True)
         gl.addWidget(self._mobi_lbl_cover)
         
         # 信息字段
