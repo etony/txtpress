@@ -267,7 +267,10 @@ class Txt2Epub:
         book.add_author(self.author)
 
         # ---- 封面 ----
-        if os.path.exists(self.cover_path):
+        # 只有封面真实存在时才注册封面并写入 spine，
+        # 否则 spine 会引用不存在的 item，产出结构非法的 EPUB
+        has_cover = os.path.exists(self.cover_path)
+        if has_cover:
             with open(self.cover_path, 'rb') as f:
                 book.set_cover('cover.jpeg', f.read())
 
@@ -286,9 +289,8 @@ class Txt2Epub:
             content=self.css_style,
         )
         book.add_item(nav_css)
-        # spine 定义了 EPUB 的阅读顺序（按什么先后顺序显示章节）
-        # 'cover' 是特殊占位符，表示封面页
-        book.spine = ['cover']
+        # spine 定义了 EPUB 的阅读顺序；'cover' 是封面页占位符
+        book.spine = ['cover'] if has_cover else []
 
         # ---- 章节解析 ----
         self._parse()
@@ -328,14 +330,21 @@ class Txt2Epub:
             ch.add_item(nav_css)
             book.add_item(ch)
             book.spine.append(ch)
+            # 加入目录，阅读器里才能看到序章
+            book.toc.append(epub.Link('xu.xhtml', '序章', 'intro'))
+            if progress and total > 0:
+                progress(1, total)
+
+        # 进度偏移：有序章时序章已占第 1 步，章节从第 2 步开始计
+        done = 1 if has_preamble else 0
 
         # ---- 逐章生成 HTML 内容 ----
         used_names = set()  # 用于检测同名冲突（两个章节同名的情况）
         for idx, (title, body) in enumerate(chapters, start=1):
             if status:
                 status(f'正在处理第 {idx}/{len(chapters)} 章: {title.strip()[:_STATUS_TITLE_LEN]}…')
-            if progress:
-                progress(idx, total)
+            if progress and total > 0:
+                progress(done + idx, total)
 
             body_html = _text_to_html(body)
             # 将标题中的特殊字符替换为下划线，生成合法的文件名

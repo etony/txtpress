@@ -91,6 +91,50 @@ def test_preamble_threshold(tmp_path):
     assert 'EPUB/xu.xhtml' in names_gt
 
 
+def test_spine_without_cover(sample_txt, tmp_path):
+    """封面缺失时 spine 不能引用 cover。"""
+    from services import Txt2Epub
+    out = tmp_path / 'no_cover.epub'
+    conv = Txt2Epub(sample_txt, str(out))
+    conv.cover_path = str(tmp_path / 'missing.jpg')
+    conv.convert()
+    with zipfile.ZipFile(str(out)) as z:
+        opf = z.read('EPUB/content.opf').decode('utf-8')
+    assert 'idref="cover"' not in opf
+
+
+def test_spine_with_cover(sample_txt, tmp_path):
+    """封面存在时 spine 应包含 cover（回归保护）。"""
+    from services import Txt2Epub
+    out = tmp_path / 'with_cover.epub'
+    conv = Txt2Epub(sample_txt, str(out))
+    conv.convert()  # 默认封面 resources/images/cover.jpeg 存在
+    with zipfile.ZipFile(str(out)) as z:
+        opf = z.read('EPUB/content.opf').decode('utf-8')
+    assert 'idref="cover"' in opf
+
+
+def test_preamble_in_toc(sample_txt, tmp_path):
+    """序章必须出现在导航目录中。"""
+    from services import Txt2Epub
+    out = tmp_path / 'toc.epub'
+    conv = Txt2Epub(sample_txt, str(out))
+    conv.convert()
+    with zipfile.ZipFile(str(out)) as z:
+        nav = z.read('EPUB/nav.xhtml').decode('utf-8')
+    assert '序章' in nav
+
+
+def test_progress_completes(sample_txt, tmp_path):
+    """最后一次进度上报应达到 total/total。"""
+    from services import Txt2Epub
+    conv = Txt2Epub(sample_txt, str(tmp_path / 'prog.epub'))
+    calls = []
+    conv.convert(progress=lambda c, t: calls.append((c, t)))
+    assert calls
+    assert calls[-1][0] == calls[-1][1]
+
+
 def test_make_epub_variants(make_epub):
     """fixture 三种参数组合均能生成并回读 EPUB。"""
     from ebooklib import epub
