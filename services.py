@@ -333,7 +333,7 @@ class Txt2Epub:
         used_names = set()  # 用于检测同名冲突（两个章节同名的情况）
         for idx, (title, body) in enumerate(chapters, start=1):
             if status:
-                status(f'正在处理第 {idx}/{total-1} 章: {title.strip()[:_STATUS_TITLE_LEN]}…')
+                status(f'正在处理第 {idx}/{len(chapters)} 章: {title.strip()[:_STATUS_TITLE_LEN]}…')
             if progress:
                 progress(idx, total)
 

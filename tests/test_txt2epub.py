@@ -40,6 +40,8 @@ def test_html_escaping(tmp_path):
         ).decode('utf-8')
     assert '<b>加粗</b>' not in joined
     assert '&lt;' in joined
+    assert '<h2>第1章 前&lt;后</h2>' in joined
+    assert '加粗' in joined
 
 
 def test_paragraph_split(tmp_path):
@@ -61,6 +63,32 @@ def test_paragraph_split(tmp_path):
         ).decode('utf-8')
     assert '<p>第一段。</p>' in joined
     assert '<p>第二段。</p>' in joined
+
+
+def test_preamble_threshold(tmp_path):
+    """序章判定按 strip 后的原始文本长度阈值（当前语义加锁）。"""
+    from services import Txt2Epub, _MIN_PREAMBLE_LEN
+
+    def build(name, preamble_text):
+        txt = tmp_path / f'{name}.txt'
+        txt.write_text(
+            preamble_text + '\n第一章 标题\n正文。\n',
+            encoding='utf-8',
+        )
+        out = str(tmp_path / f'{name}.epub')
+        conv = Txt2Epub(str(txt), out)
+        conv.cover_path = str(tmp_path / 'missing.jpg')
+        conv.convert()
+        with zipfile.ZipFile(out) as z:
+            return z.namelist()
+
+    thr = _MIN_PREAMBLE_LEN
+    # strip 后恰好等于阈值（两侧空白不计）→ 不生成序章
+    names_eq = build('eq', '  ' + 'a' * thr + '  ')
+    assert 'EPUB/xu.xhtml' not in names_eq
+    # strip 后超过阈值 1 个字符 → 生成序章
+    names_gt = build('gt', 'a' * (thr + 1))
+    assert 'EPUB/xu.xhtml' in names_gt
 
 
 def test_make_epub_variants(make_epub):
