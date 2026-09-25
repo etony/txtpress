@@ -612,7 +612,7 @@ class Epub2Txt:
             break  # 只在第一个标题后加换行
         text = self._cc.convert(soup.get_text()) if fanjian else soup.get_text()
         text = text.rstrip('\n') + '\n'
-        # 分隔符追加到每章文本末尾（'（无）'时 window 传入空串，不追加）
+        # 分隔符追加到每章文本末尾（'（无）'时 window 不赋值，保持默认空串）
         if self.sep:
             text += self.sep
         return text
@@ -711,17 +711,24 @@ class Epub2Txt:
         docs = self._get_content_items()
         total = len(docs)
 
-        for idx, item in enumerate(docs, start=1):
-            if status:
-                status(f'正在导出第 {idx}/{total} 章…')
-            if progress:
-                progress(idx, total)
+        # 按章节导出每个文件只有一章，章节间分隔符不适用，
+        # 导出前暂时清空 sep，结束后恢复（try/finally 保证异常路径也恢复）
+        saved_sep = self.sep
+        self.sep = ''
+        try:
+            for idx, item in enumerate(docs, start=1):
+                if status:
+                    status(f'正在导出第 {idx}/{total} 章…')
+                if progress:
+                    progress(idx, total)
 
-            text = self._process_document(item, fanjian)
+                text = self._process_document(item, fanjian)
 
-            chapter_path = os.path.join(out_dir, f'{base}{idx}{ext}')
-            with open(chapter_path, 'w', encoding=self.encoding) as f:
-                f.write(text)
+                chapter_path = os.path.join(out_dir, f'{base}{idx}{ext}')
+                with open(chapter_path, 'w', encoding=self.encoding) as f:
+                    f.write(text)
+        finally:
+            self.sep = saved_sep
 
 
 # =====================================================================
