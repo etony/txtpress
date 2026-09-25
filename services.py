@@ -612,8 +612,8 @@ class Epub2Txt:
             break  # 只在第一个标题后加换行
         text = self._cc.convert(soup.get_text()) if fanjian else soup.get_text()
         text = text.rstrip('\n') + '\n'
-        # 分隔符处理：如果用户选了分隔符且不是纯换行，追加到文本末尾
-        if self.sep and not self.sep.startswith('\n'):
+        # 分隔符追加到每章文本末尾（'（无）'时 window 传入空串，不追加）
+        if self.sep:
             text += self.sep
         return text
 
