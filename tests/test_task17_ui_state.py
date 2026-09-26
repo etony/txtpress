@@ -83,14 +83,14 @@ def test_reset_tab1_restores_all_fields(main_window):
     for widget, expected in text_defaults:
         assert widget.text() == expected, widget.accessibleName() or widget
     combo_defaults = (
-        (win._cb_encode, 0),
-        (win._cb_regex_preset, 0),
-        (win._cb_epub_style, 0),
-        (win._cb_font, 0),
-        (win._cb_toc_style, 0),
+        (win._cb_encode, 0, '文件编码'),
+        (win._cb_regex_preset, 0, '正则预设'),
+        (win._cb_epub_style, 0, 'EPUB 样式'),
+        (win._cb_font, 0, '正文字体'),
+        (win._cb_toc_style, 0, '目录样式'),
     )
-    for combo, expected in combo_defaults:
-        assert combo.currentIndex() == expected
+    for combo, expected, name in combo_defaults:
+        assert combo.currentIndex() == expected, name
     assert win._txt_cover == ''
     assert win._cover_label.pixmap() is not None
     assert not win._cover_label.pixmap().isNull()
@@ -270,11 +270,12 @@ def test_tab2_allows_clean_output_path(main_window, make_epub, tmp_path):
     win._le_out_txt.setText(str(tmp_path / 'out.txt'))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
-            mock.patch.object(wmod.QMessageBox, 'warning'), \
+            mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
         win._on_convert_chapter()
 
     question.assert_not_called()
+    warn.assert_not_called()
     run.assert_called_once()
 
 
@@ -321,11 +322,12 @@ def test_tab3_allows_clean_output_path(main_window, tmp_path):
     win._le_mobi_txt.setText(str(tmp_path / 'out.txt'))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
-            mock.patch.object(wmod.QMessageBox, 'warning'), \
+            mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
         win._on_convert_mobi_to_txt()
 
     question.assert_not_called()
+    warn.assert_not_called()
     run.assert_called_once()
 
 
@@ -370,3 +372,181 @@ def test_ask_open_dir_no_skips_open(main_window, tmp_path):
         main_window._ask_open_dir(str(tmp_path))
 
     od.assert_not_called()
+
+
+# ================================================================
+# 评审 With fixes：_confirm_output_path 直测
+# ================================================================
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='normcase 仅 Windows 下折叠大小写')
+def test_confirm_path_case_insensitive_same_path(main_window, tmp_path):
+    """大小写差异的同一路径（C:\\Out.epub vs c:\\out.epub）→ 拒绝。"""
+    out = str(tmp_path / 'Out.epub')
+    in_lower = out.lower()
+
+    with mock.patch.object(wmod.QMessageBox, 'warning') as warn:
+        ok = main_window._confirm_output_path(in_lower, out)
+
+    assert ok is False
+    assert '输出路径不能与输入文件相同' in warn.call_args.args[2]
+
+
+def test_confirm_path_relative_vs_absolute_same_file(main_window, tmp_path,
+                                                     monkeypatch):
+    """相对路径 vs 绝对路径指向同一文件（abspath 归一）→ 拒绝。"""
+    f = tmp_path / 'book.txt'
+    f.write_text('x', encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+
+    with mock.patch.object(wmod.QMessageBox, 'warning') as warn:
+        ok = main_window._confirm_output_path('book.txt', str(f))
+
+    assert ok is False
+    assert '输出路径不能与输入文件相同' in warn.call_args.args[2]
+
+
+def test_confirm_path_rejects_directory_output(main_window, tmp_path):
+    """输出路径是已存在的目录 → 前置拒绝，不弹覆盖确认。
+
+    决策：目录永远不可能是合法输出文件，"覆盖"语义不成立；
+    若放行到覆盖确认，Yes 后 worker 必抛 IsADirectoryError。
+    """
+    d = tmp_path / 'outdir'
+    d.mkdir()
+
+    with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
+            mock.patch.object(wmod.QMessageBox, 'question') as question:
+        ok = main_window._confirm_output_path(str(tmp_path / 'in.epub'),
+                                              str(d))
+
+    assert ok is False
+    question.assert_not_called()
+    assert '输出路径是已存在的目录' in warn.call_args.args[2]
+
+
+def test_confirm_path_out_dir_is_file_wording(main_window, tmp_path):
+    """目录位置被同名文件占位 → 文案说"不是有效目录"而非"不存在"。"""
+    blocker = tmp_path / 'outdir.txt'
+    blocker.write_text('x', encoding='utf-8')
+    out = blocker / 'out.txt'   # 位于"目录"位置的其实是个文件
+
+    with mock.patch.object(wmod.QMessageBox, 'warning') as warn:
+        ok = main_window._confirm_output_path(str(tmp_path / 'in.epub'),
+                                              str(out))
+
+    assert ok is False
+    msg = warn.call_args.args[2]
+    assert '输出目录不是有效目录' in msg
+    assert '不存在' not in msg
+
+
+def test_confirm_path_missing_dir_has_remedy_hint(main_window, tmp_path):
+    """缺目录文案带补救指引。"""
+    out = tmp_path / 'no_such_dir' / 'out.txt'
+
+    with mock.patch.object(wmod.QMessageBox, 'warning') as warn:
+        ok = main_window._confirm_output_path(str(tmp_path / 'in.epub'),
+                                              str(out))
+
+    assert ok is False
+    assert '请先创建目录或改选已存在的目录' in warn.call_args.args[2]
+
+
+def test_confirm_path_chapter_mode_probes_chapter1(main_window, tmp_path):
+    """章节模式：探测 {base}1.txt 而非 out.txt 本身。
+
+    - 仅 out.txt（合并产物）存在 → 不弹确认，放行
+    - out1.txt（第 1 章输出）存在 → 弹确认，文案点明第 1 章且路径是 out1
+    """
+    in_epub = str(tmp_path / 'in.epub')
+    out = tmp_path / 'out.txt'
+    out.write_text('merged', encoding='utf-8')
+
+    # 仅 out.txt 存在：章节模式不该问
+    with mock.patch.object(wmod.QMessageBox, 'question') as question:
+        ok = main_window._confirm_output_path(in_epub, str(out),
+                                              chapter_mode=True)
+    assert ok is True
+    question.assert_not_called()
+
+    # out1.txt 也存在：以它为确认依据
+    ch1 = tmp_path / 'out1.txt'
+    ch1.write_text('ch1', encoding='utf-8')
+    with mock.patch.object(wmod.QMessageBox, 'question',
+                           return_value=wmod.QMessageBox.StandardButton.No
+                           ) as question:
+        ok = main_window._confirm_output_path(in_epub, str(out),
+                                              chapter_mode=True)
+
+    assert ok is False
+    text = question.call_args.args[2]
+    assert '第 1 章输出文件已存在' in text
+    assert str(ch1) in text
+    assert str(out) not in text          # 文案不指向 out.txt 本身
+    # 默认按钮显式为 Yes（Minor 4）
+    assert question.call_args.args[4] == wmod.QMessageBox.StandardButton.Yes
+
+
+def test_confirm_path_merge_mode_probes_out_path(main_window, tmp_path):
+    """非章节模式行为不变：探测 out_path 本身。"""
+    in_epub = str(tmp_path / 'in.epub')
+    out = tmp_path / 'out.txt'
+    out.write_text('merged', encoding='utf-8')
+
+    with mock.patch.object(wmod.QMessageBox, 'question',
+                           return_value=wmod.QMessageBox.StandardButton.No
+                           ) as question:
+        ok = main_window._confirm_output_path(in_epub, str(out))
+
+    assert ok is False
+    text = question.call_args.args[2]
+    assert '目标文件已存在' in text
+    assert str(out) in text
+
+
+def test_chapter_export_confirmation_targets_chapter1(main_window, make_epub,
+                                                      tmp_path):
+    """端到端（_on_convert_chapter）：确认弹窗依据是 out1.txt。"""
+    win = main_window
+    path = make_epub()
+    out = tmp_path / 'out.txt'
+    out.write_text('merged', encoding='utf-8')
+    ch1 = tmp_path / 'out1.txt'
+    ch1.write_text('ch1', encoding='utf-8')
+    win._le_in_epub.setText(path)
+    win._le_out_txt.setText(str(out))
+
+    with mock.patch.object(wmod.QMessageBox, 'question',
+                           return_value=wmod.QMessageBox.StandardButton.No
+                           ) as question, \
+            mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
+            mock.patch.object(win, '_run_worker') as run:
+        win._on_convert_chapter()
+
+    question.assert_called_once()
+    text = question.call_args.args[2]
+    assert str(ch1) in text and '第 1 章' in text
+    assert str(out) not in text
+    warn.assert_not_called()
+    run.assert_not_called()
+
+
+def test_chapter_export_runs_when_only_out_txt_exists(main_window, make_epub,
+                                                      tmp_path):
+    """端到端：仅合并产物 out.txt 存在时，章节导出直接放行（无假确认）。"""
+    win = main_window
+    path = make_epub()
+    out = tmp_path / 'out.txt'
+    out.write_text('merged', encoding='utf-8')
+    win._le_in_epub.setText(path)
+    win._le_out_txt.setText(str(out))
+
+    with mock.patch.object(wmod.QMessageBox, 'question') as question, \
+            mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
+            mock.patch.object(win, '_run_worker') as run:
+        win._on_convert_chapter()
+
+    question.assert_not_called()
+    warn.assert_not_called()
+    run.assert_called_once()

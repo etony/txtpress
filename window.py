@@ -1272,7 +1272,8 @@ class MainWindow(QMainWindow):
         if not txt_path:
             QMessageBox.warning(self, '提示', '请指定 TXT 保存路径')
             return
-        if not self._confirm_output_path(epub_path, txt_path):
+        if not self._confirm_output_path(epub_path, txt_path,
+                                         chapter_mode=chapter_mode):
             return
 
         self._save_config()
@@ -1793,17 +1794,26 @@ class MainWindow(QMainWindow):
     # 辅助
     # ================================================================
 
-    def _confirm_output_path(self, in_path: str, out_path: str) -> bool:
+    def _confirm_output_path(self, in_path: str, out_path: str,
+                             chapter_mode: bool = False) -> bool:
         """输出路径保护（计划 Task 17 Step 2）。
 
         校验规则：
         1. 输出路径不能与输入文件相同（防止就地覆盖源文件）
         2. 输出目录必须已存在（不做隐式创建，避免手误建出目录）
-        3. 目标文件已存在时弹 Yes/No 覆盖确认
+        3. 输出路径本身是已存在的目录 → 拒绝（目录不能当输出文件，
+           放进覆盖确认会在 Yes 后由 worker 抛 IsADirectoryError）
+        4. 目标文件已存在时弹 Yes/No 覆盖确认
+
+        章节模式（chapter_mode=True）：按章节导出实际写入的是
+        {base}1.txt、{base}2.txt…（services.Epub2Txt.convert_chapter），
+        从不写 out_path 本身——覆盖确认以第 1 章输出为探测对象，
+        文案也点明是章节文件，避免误以为在覆盖 out_path。
 
         Args:
             in_path: 输入文件路径（调用方已校验存在）
             out_path: 输出文件路径（调用方已校验非空）
+            chapter_mode: 是否按章节导出（仅影响覆盖确认的探测对象）
 
         Returns:
             True=允许继续转换；False=已提示并拒绝
@@ -1814,14 +1824,35 @@ class MainWindow(QMainWindow):
             return False
         out_dir = os.path.dirname(out_path)
         if out_dir and not os.path.isdir(out_dir):
-            QMessageBox.warning(self, '提示', f'输出目录不存在:\n{out_dir}')
+            if os.path.exists(out_dir):
+                # 目录位置被同名文件占位，说"不存在"会误导
+                QMessageBox.warning(
+                    self, '提示',
+                    f'输出目录不是有效目录:\n{out_dir}\n请改选已存在的目录')
+            else:
+                QMessageBox.warning(
+                    self, '提示',
+                    f'输出目录不存在:\n{out_dir}\n请先创建目录或改选已存在的目录')
             return False
-        if os.path.exists(out_path):
+        if os.path.isdir(out_path):
+            QMessageBox.warning(
+                self, '提示',
+                f'输出路径是已存在的目录，请改选文件路径:\n{out_path}')
+            return False
+
+        probe = out_path
+        label = '目标文件'
+        if chapter_mode:
+            base, ext = os.path.splitext(os.path.basename(out_path))
+            probe = os.path.join(out_dir, f'{base}1{ext}')
+            label = '第 1 章输出文件'
+        if os.path.exists(probe):
             if QMessageBox.question(
                 self, '确认覆盖',
-                f'目标文件已存在:\n{out_path}\n是否覆盖？',
+                f'{label}已存在:\n{probe}\n是否覆盖？',
                 QMessageBox.StandardButton.Yes
                 | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
             ) != QMessageBox.StandardButton.Yes:
                 return False
         return True
