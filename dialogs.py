@@ -89,6 +89,12 @@ class ChapterDialog(QDialog):
             # flags 是 bitmask，用 | 组合多个 flag
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
             self._list.addItem(item)
+        # InternalMove 拖拽会经 dropMimeData 重建 item，
+        # mime 只序列化角色值（UserRole）不序列化 flags，
+        # 拖过的行会丢失 ItemIsEditable 无法再双击重命名。
+        # 这里在移动/插入完成后统一补回可编辑标志。
+        self._list.model().rowsMoved.connect(self._restore_editable_flags)
+        self._list.model().rowsInserted.connect(self._restore_editable_flags)
         layout.addWidget(self._list)
 
         # ---- 按钮区域 ----
@@ -106,6 +112,12 @@ class ChapterDialog(QDialog):
         h.addWidget(btn)
         h.addStretch()
         layout.addLayout(h)
+
+    def _restore_editable_flags(self, *args):
+        """拖拽重建 item 后恢复 ItemIsEditable（信号槽签名用 *args 兼容）。"""
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
 
     def get_ordered_items(self) -> list[tuple[int, str]]:
         """

@@ -180,7 +180,9 @@ class Txt2Epub:
         """设置自定义章节顺序：[(原始索引, 新标题), ...]。
 
         用索引而不是标题匹配：重命名后的标题查不到原章，
-        重复标题也会互相覆盖。传 None 表示按原始文件顺序。"""
+        重复标题也会互相覆盖。传 None 表示按原始文件顺序。
+        只影响 convert() 的输出顺序，对 get_chapters() 无效
+        （get_chapters 始终返回原始顺序）。"""
         self._chapter_order = ordered
 
     def _parse(self):
@@ -308,9 +310,12 @@ class Txt2Epub:
             reordered = []
             used: set[int] = set()
             for idx, new_title in self._chapter_order:
-                if 0 <= idx < len(chapters) and idx not in used:
-                    _, body = chapters[idx]
-                    reordered.append((new_title, body))
+                # isinstance 防御：异常来源的 data() 可能返回 None
+                if isinstance(idx, int) and 0 <= idx < len(chapters) and idx not in used:
+                    old_title, body = chapters[idx]
+                    # 空白新标题回退原标题，避免生成空文件名和空目录链接
+                    title = (new_title or '').strip() or old_title
+                    reordered.append((title, body))
                     used.add(idx)
             # 未出现在列表中的章节按原序补到末尾（防止丢章）
             for i, pair in enumerate(chapters):

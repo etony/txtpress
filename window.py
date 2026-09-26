@@ -185,6 +185,7 @@ class MainWindow(QMainWindow):
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
         self._ordered_chapters: list[tuple[int, str]] | None = None  # ChapterDialog 调整后的章节 [(原始索引, 新标题)]
+        self._ordered_chapters_src: tuple[str, str, str] | None = None  # _ordered_chapters 的来源指纹 (txt路径, 正则, 编码)
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
 
         # ---- 窗口基础 ----
@@ -908,6 +909,22 @@ class MainWindow(QMainWindow):
         """选择封面图片（tab1）。"""
         self._on_choose_cover_impl('_txt_cover', self._cover_label)
 
+    def _parse_key(self) -> tuple[str, str, str]:
+        """当前解析输入的指纹：(txt路径, 生效正则, 生效编码)。
+
+        _ordered_chapters 里的索引绑定某次解析结果，
+        换文件/改正则/改编码后旧索引会错配到别的章节，
+        因此预览时记录指纹，转换时比对，不一致就丢弃顺序。
+        """
+        txt = self._le_txt.text().strip()
+        reg = self._te_reg.text().strip()
+        if len(reg) < _MIN_REGEX_LEN:
+            reg = DEFAULT_CHAPTER_REGEX
+        # 索引 0 是"自动检测"，转换器保持默认编码 utf-8
+        enc = (self._cb_encode.currentText()
+               if self._cb_encode.currentIndex() != 0 else 'utf-8')
+        return (txt, reg, enc)
+
     def _on_preview_chapters(self):
         """
         目录预览。
@@ -938,13 +955,17 @@ class MainWindow(QMainWindow):
             # exec() 返回 QDialog.Accepted（确定）或 Rejected（关闭）
             if dlg.exec():
                 items = dlg.get_ordered_items()
-                original = [(i, t) for i, t in enumerate(chapters)]
+                # get_ordered_items 已 strip，原始标题也要 strip 才能正确判"未改动"
+                original = [(i, t.strip()) for i, t in enumerate(chapters)]
                 if items != original:
                     self._ordered_chapters = items
+                    # 记录来源指纹，转换时校验，输入变化后旧索引作废
+                    self._ordered_chapters_src = self._parse_key()
                     self.statusBar().showMessage(
                         f'章节顺序已调整（{len(items)} 章）')
                 else:
                     self._ordered_chapters = None
+                    self._ordered_chapters_src = None
         except Exception as e:
             QMessageBox.critical(self, '错误', f'解析目录失败:\n{e}')
             logger.exception('目录预览失败')
@@ -960,6 +981,7 @@ class MainWindow(QMainWindow):
         self._cb_encode.setCurrentIndex(0)
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
+        self._ordered_chapters_src = None
         self._reset_status('tab1')
 
     def _on_convert_tab1(self):
@@ -1003,8 +1025,14 @@ class MainWindow(QMainWindow):
         reg = self._te_reg.text().strip()
         if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
-        # 如果有自定义章节顺序，传给转换器
-        conv.set_chapter_order(self._ordered_chapters)
+        # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
+        # 别的章节（索引通常仍合法，补尾救不了），直接丢弃本次顺序
+        order = self._ordered_chapters
+        if order is not None and self._ordered_chapters_src != self._parse_key():
+            order = None
+            self.statusBar().showMessage('章节顺序因输入变化已失效，按原序转换')
+            logger.info('章节顺序因输入变化已失效，按原序转换')
+        conv.set_chapter_order(order)
         
         # 加载EPUB样式
         style_name = self._cb_epub_style.currentText()
