@@ -720,7 +720,7 @@ class Epub2Txt:
             status:   状态回调 (message)
         """
         # 先确保输出目录存在，再提取封面（顺序反了目录不存在会 FileNotFoundError）
-        out_dir = os.path.dirname(self.txt_path)
+        out_dir = self._dir
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
 
@@ -760,7 +760,7 @@ class Epub2Txt:
             progress: 进度回调 (current, total)
             status:   状态回调 (message)
         """
-        out_dir = os.path.dirname(self.txt_path)
+        out_dir = self._dir
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
 

@@ -48,3 +48,6 @@ def test_convert_chapter_outdir_empty(make_epub, tmp_path, monkeypatch):
     conv = Epub2Txt(make_epub(), 'base.txt')
     conv.convert_chapter()
     assert (tmp_path / 'base1.txt').exists()
+    files = list(tmp_path.glob('base*.txt'))
+    assert len(files) == 2  # 防第 1 章后中断仍绿
+    assert any(f.stat().st_size > 0 for f in files)  # 至少一个产物非空
