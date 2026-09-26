@@ -798,7 +798,9 @@ class Epub2Txt:
         docs = self._get_content_items()
         total = len(docs)
 
-        with open(self.txt_path, 'w', encoding=self.encoding) as f:
+        # 解码侧已 replace（_process_document），编码侧同样兜底：
+        # U+FFFD 无法写入 gbk/gb2312/big5，严格模式会中断转换并截断 txt
+        with open(self.txt_path, 'w', encoding=self.encoding, errors='replace') as f:
             for idx, item in enumerate(docs, start=1):
                 if status:
                     status(f'正在处理第 {idx}/{total} 个文档…')
@@ -855,7 +857,9 @@ class Epub2Txt:
                 text = self._process_document(item, fanjian)
 
                 chapter_path = os.path.join(out_dir, f'{base}{idx}{ext}')
-                with open(chapter_path, 'w', encoding=self.encoding) as f:
+                # 编码侧 replace 兜底，与 convert() 写点保持一致
+                with open(chapter_path, 'w', encoding=self.encoding,
+                          errors='replace') as f:
                     f.write(text)
         finally:
             self.sep = saved_sep

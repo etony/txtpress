@@ -20,6 +20,25 @@ def test_process_document_tolerates_invalid_utf8(make_epub, tmp_path):
     assert 'caf' in text
 
 
+def test_convert_gbk_output_survives_invalid_utf8(make_epub, tmp_path,
+                                                  monkeypatch):
+    """解码 replace 产生的 U+FFFD 在 gbk 输出下不应中断整个转换。"""
+    conv = Epub2Txt(make_epub(), str(tmp_path / 'o.txt'), encoding='gbk')
+
+    class StubDoc:
+        def get_content(self):
+            return b'<p>caf\xe9</p>'
+
+    monkeypatch.setattr(conv, '_get_content_items', lambda: [StubDoc()])
+
+    conv.convert()  # 修复前：写 gbk 时 UnicodeEncodeError
+    conv.convert_chapter()
+
+    text = (tmp_path / 'o.txt').read_text(encoding='gbk')
+    assert 'caf?' in text  # U+FFFD 编码失败降级为 ?
+    assert (tmp_path / 'o1.txt').exists()
+
+
 def test_extract_images_dedupes_names(make_epub, tmp_path):
     """不同子目录的同名图片不能互相覆盖。"""
     epub_path = make_epub(images=['images/a.png', 'pics/a.png'])
@@ -30,20 +49,19 @@ def test_extract_images_dedupes_names(make_epub, tmp_path):
     assert (tmp_path / 'imgs' / 'a_2.png').exists()
 
 
-def test_save_cover_tolerates_none_id(make_epub, tmp_path):
-    """item.id 为 None 时不应抛 TypeError。"""
+def _stub_cover_book(name: str, item_id):
+    """构造只含单张图片的桩 book，图片名与 id 可控。"""
     import ebooklib
 
-    conv = Epub2Txt(make_epub(), str(tmp_path / 'o.txt'))
-
     class StubItem:
-        id = None
+        def __init__(self):
+            self.id = item_id
 
         def get_type(self):
             return ebooklib.ITEM_IMAGE
 
         def get_name(self):
-            return 'frontcover.png'
+            return name
 
         def get_content(self):
             return b'PNG'
@@ -52,9 +70,27 @@ def test_save_cover_tolerates_none_id(make_epub, tmp_path):
         def get_items(self):
             return [StubItem()]
 
-    conv._book = StubBook()
-    conv._save_cover_if_exists()  # 不应抛异常
-    assert (tmp_path / 'cover.png').exists()
+    return StubBook()
+
+
+def test_save_cover_tolerates_none_id(make_epub, tmp_path):
+    """name 不含 cover 且 id=None：id 判断分支不抛 TypeError，也不误存封面。"""
+    conv = Epub2Txt(make_epub(), str(tmp_path / 'o.txt'))
+    conv._book = _stub_cover_book('front.png', None)
+
+    conv._save_cover_if_exists()  # 修复前 'cover' in None 抛 TypeError
+    assert not (tmp_path / 'cover.png').exists()
+
+
+def test_save_cover_matches_id_branch(make_epub, tmp_path):
+    """name 不含 cover 但 id 含 cover：id 分支仍能识别并保存封面。"""
+    conv = Epub2Txt(make_epub(), str(tmp_path / 'o.txt'))
+    conv._book = _stub_cover_book('front.png', 'mycover')
+
+    conv._save_cover_if_exists()
+    saved = tmp_path / 'cover.png'
+    assert saved.exists()
+    assert saved.read_bytes() == b'PNG'
 
 
 def _fake_mobi_extract(tmp_path, monkeypatch, files: dict):
