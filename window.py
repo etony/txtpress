@@ -65,6 +65,7 @@ from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
 from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS, FONT_PRESETS, TOC_STYLES
 from theme_manager import theme_manager, Theme
+from error_handler import show_error
 
 
 # ---- 资源路径 ----
@@ -1003,8 +1004,11 @@ class MainWindow(QMainWindow):
                 else:
                     self._ordered_chapters = None
                     self._ordered_chapters_src = None
+        except ValueError as e:
+            show_error(self, '错误', 'regex_invalid', str(e))
+            logger.exception('目录预览失败')
         except Exception as e:
-            QMessageBox.critical(self, '错误', f'解析目录失败:\n{e}')
+            show_error(self, '错误', 'conversion_failed', str(e))
             logger.exception('目录预览失败')
 
     def _on_reset_tab1(self):
@@ -1182,7 +1186,8 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f'已加载: {fname}')
 
         self._run_worker(target=_read, on_success=_fill,
-                         fail_msg='读取失败', show_progress=False)
+                         fail_msg='读取失败', show_progress=False,
+                         error_code='epub_read_failed')
 
     def _on_browse_out_txt(self):
         """浏览——选择 TXT 保存路径。"""
@@ -1237,7 +1242,8 @@ class MainWindow(QMainWindow):
             logger.info(f'元信息已更新: {epub_path}')
 
         self._run_worker(target=_write, on_success=_after,
-                         fail_msg='保存失败', show_progress=False)
+                         fail_msg='保存失败', show_progress=False,
+                         error_code='epub_write_failed')
 
     def _run_epub_to_txt(self, chapter_mode: bool):
         """EPUB→TXT 转换（合并/按章节通用入口）。
@@ -1330,7 +1336,8 @@ class MainWindow(QMainWindow):
                 logger.info('提取图片: 未找到图片')
 
         self._run_worker(target=_extract, on_success=_after,
-                         fail_msg='提取失败', show_progress=False)
+                         fail_msg='提取失败', show_progress=False,
+                         error_code='epub_read_failed')
 
     def _on_fanjian_toggled(self, state):
         """
@@ -1446,7 +1453,8 @@ class MainWindow(QMainWindow):
                 self._mobi_lbl_cover.setText('无封面')
 
         self._run_worker(target=_read, on_success=_fill,
-                         fail_msg='读取 MOBI 失败', show_progress=False)
+                         fail_msg='读取 MOBI 失败', show_progress=False,
+                         error_code='mobi_read_failed')
 
     def _on_refresh_mobi_info(self):
         """手动刷新 MOBI 文件的书籍信息"""
@@ -1644,6 +1652,7 @@ class MainWindow(QMainWindow):
 
     def _run_worker(self, target, success_msg: str = '', dir_to_open: str = '',
                     on_success=None, fail_msg: str = '转换失败',
+                    error_code: str = 'conversion_failed',
                     show_progress: bool = True):
         """
         启动后台线程执行耗时操作。
@@ -1669,6 +1678,7 @@ class MainWindow(QMainWindow):
             dir_to_open: 成功后询问是否打开的目录（空则不询问）
             on_success: 成功后在主线程执行的回调（用于回填 UI）
             fail_msg: 失败时的提示前缀
+            error_code: error_handler.ERROR_MESSAGES 中的错误码
             show_progress: 是否显示进度条与取消按钮（元数据读取为 False）
         """
 
@@ -1735,7 +1745,7 @@ class MainWindow(QMainWindow):
                 if dir_to_open:
                     self._ask_open_dir(dir_to_open)
             else:
-                QMessageBox.critical(self, '错误', f'{fail_msg}:\n{err}')
+                show_error(self, '错误', error_code, err)
                 self.statusBar().showMessage(fail_msg)
 
         # ---- 启动线程 ----

@@ -11,6 +11,9 @@ Task 11 三态结果：task_done(成功, 错误消息, 是否被取消)，
 
 Task 12：on_success 回调时机、fail_msg 文案、show_progress 显隐，
 以及 _load_epub_file 迁移后的真实 worker 端到端回填。
+
+Task 14：error_handler 友好错误提示——_run_worker 的 error_code 映射、
+调用点错误码分配、_on_preview_chapters 的 regex_invalid 接入。
 """
 import os
 import sys
@@ -247,7 +250,7 @@ def test_done_calls_on_success_before_ask_open_dir(main_window, monkeypatch):
 
 
 def test_done_skips_on_success_on_failure(main_window, monkeypatch):
-    """失败：on_success 不执行，弹窗与状态栏都用 fail_msg 文案。"""
+    """失败：on_success 不执行，弹窗走 error_handler 友好文案，状态栏用 fail_msg。"""
     monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
     on_success = mock.Mock()
     main_window._run_worker(lambda p, s: None,
@@ -260,8 +263,9 @@ def test_done_skips_on_success_on_failure(main_window, monkeypatch):
         done(False, 'boom', False)
 
     on_success.assert_not_called()
-    assert '读取失败' in crit.call_args.args[2]
-    assert 'boom' in crit.call_args.args[2]
+    msg = crit.call_args.args[2]
+    assert '转换过程中发生错误' in msg  # 默认 error_code='conversion_failed'
+    assert 'boom' in msg
     assert main_window.statusBar().currentMessage() == '读取失败'
     assert main_window._worker is None
 
@@ -399,7 +403,7 @@ def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
 
 
 def test_extract_images_end_to_end_failure(main_window, qapp, tmp_path):
-    """端到端失败路径：坏 EPUB 走 fail_msg 弹窗与状态栏。"""
+    """端到端失败路径：坏 EPUB 走 epub_read_failed 友好弹窗与 fail_msg 状态栏。"""
     bad = tmp_path / 'bad.epub'
     bad.write_bytes(b'not an epub at all')
     main_window._le_in_epub.setText(str(bad))
@@ -409,7 +413,138 @@ def test_extract_images_end_to_end_failure(main_window, qapp, tmp_path):
         _wait_worker(main_window, qapp)
 
     crit.assert_called_once()
-    assert crit.call_args.args[2].startswith('提取失败:')
+    assert crit.call_args.args[2].startswith('无法读取EPUB文件')
     assert main_window.statusBar().currentMessage() == '提取失败'
     assert main_window._worker is None
     assert main_window._tabs.isEnabled() is True
+
+
+# ================================================================
+# Task 14：error_handler 友好错误提示
+# ================================================================
+
+
+def _run_to_failure(main_window, start_fn):
+    """启动假 worker 并触发失败完成，返回 QMessageBox.critical 的调用。"""
+    main_window._worker = None
+    start_fn()
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+    return crit
+
+
+def test_done_failure_shows_friendly_message(main_window, monkeypatch):
+    """error_code 有映射：弹窗标题'错误'，正文为友好文案 + 原始详情。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None, fail_msg='读取失败',
+                            error_code='epub_read_failed')
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+
+    crit.assert_called_once()
+    assert crit.call_args.args[1] == '错误'
+    msg = crit.call_args.args[2]
+    assert '无法读取EPUB文件，文件可能已损坏' in msg  # ERROR_MESSAGES 映射
+    assert 'boom' in msg                            # 原始错误详情保留
+    assert main_window.statusBar().currentMessage() == '读取失败'
+
+
+def test_done_failure_default_error_code(main_window, monkeypatch):
+    """不传 error_code 时默认 'conversion_failed'，同样显示友好文案。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None)
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+
+    msg = crit.call_args.args[2]
+    assert '转换过程中发生错误' in msg
+    assert 'boom' in msg
+
+
+def test_done_failure_unknown_error_code(main_window, monkeypatch):
+    """未收录的 error_code：按计划仍走 show_error 兜底文案（无 fail_msg 回退）。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None, fail_msg='读取失败',
+                            error_code='no_such_code')
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+
+    msg = crit.call_args.args[2]
+    assert '发生了未知错误' in msg  # error_handler 对未知码的兜底
+    assert 'boom' in msg
+    assert main_window.statusBar().currentMessage() == '读取失败'
+
+
+def test_run_worker_call_sites_error_codes(main_window, monkeypatch,
+                                           tmp_path):
+    """四个调用点的 error_code 分配（计划 Step 4 全量核对）。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+
+    # 1. _load_epub_file → epub_read_failed
+    crit = _run_to_failure(
+        main_window,
+        lambda: main_window._load_epub_file(str(tmp_path / 'x.epub')))
+    assert '无法读取EPUB文件' in crit.call_args.args[2]
+
+    # 2. _on_save_metadata → epub_write_failed（校验要求 EPUB 存在）
+    epub = tmp_path / 'x.epub'
+    epub.write_bytes(b'x')
+    main_window._le_in_epub.setText(str(epub))
+    crit = _run_to_failure(main_window, main_window._on_save_metadata)
+    assert '保存EPUB文件失败' in crit.call_args.args[2]
+
+    # 3. _on_extract_images → epub_read_failed
+    crit = _run_to_failure(main_window, main_window._on_extract_images)
+    assert '无法读取EPUB文件' in crit.call_args.args[2]
+
+    # 4. _load_mobi_metadata → mobi_read_failed
+    crit = _run_to_failure(
+        main_window,
+        lambda: main_window._load_mobi_metadata(str(tmp_path / 'x.mobi')))
+    assert '无法读取MOBI文件' in crit.call_args.args[2]
+
+
+def test_preview_invalid_regex_uses_regex_invalid(main_window, tmp_path):
+    """预览正则 ValueError（非捕获组）→ regex_invalid 友好文案，详情含捕获组。"""
+    txt = tmp_path / 'book.txt'
+    txt.write_text('第1章 开始\n正文内容', encoding='utf-8')
+    main_window._le_txt.setText(str(txt))
+    main_window._te_reg.setText('(?:第.+章)')  # 0 捕获组 → ValueError
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        main_window._on_preview_chapters()
+
+    crit.assert_called_once()
+    assert crit.call_args.args[1] == '错误'
+    msg = crit.call_args.args[2]
+    assert '正则表达式格式错误，请检查语法' in msg  # regex_invalid 映射
+    assert '捕获组' in msg                        # 详情带出捕获组上下文
+
+
+def test_preview_generic_error_uses_conversion_failed(main_window, tmp_path,
+                                                      monkeypatch):
+    """预览非 ValueError 异常 → conversion_failed 友好文案。"""
+    txt = tmp_path / 'book.txt'
+    txt.write_text('第1章 开始\n正文内容', encoding='utf-8')
+    main_window._le_txt.setText(str(txt))
+    monkeypatch.setattr(wmod, 'Txt2Epub',
+                        mock.Mock(side_effect=RuntimeError('boom')))
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        main_window._on_preview_chapters()
+
+    crit.assert_called_once()
+    msg = crit.call_args.args[2]
+    assert '转换过程中发生错误' in msg
+    assert 'boom' in msg
