@@ -73,8 +73,11 @@ QStatusBar { background: #252526; color: #CCCCCC; border-top: 1px solid #3E3E3E;
 QToolTip { background: #3C3C3C; color: #E0E0E0; }
 QMenu { background: #2D2D2D; color: #E0E0E0; border: 1px solid #3E3E3E; }
 QMenu::item:selected { background: #1E3A5F; }
-QLabel#cover_label { background: #3C3C3C; border: 1px solid #3E3E3E; }
-QLabel#cover_label:hover { background: #1E3A5F; border-color: #4A9EFF; }
+/* 封面控件 _ClickableLabel 继承 QWidget 而非 QLabel，
+   必须用纯 id 选择器，带 QLabel 前缀会因类型不匹配而不命中 */
+#cover_label { background: #3C3C3C; border: 1px solid #3E3E3E; }
+#cover_label:hover { background: #1E3A5F; border-color: #4A9EFF; }
+QMainWindow[dragging="true"] { background: #1E3A5F; border: 2px dashed #4A9EFF; }
 '''
 
 

@@ -251,12 +251,14 @@ QLabel {
     font-size: 12px;
     background: transparent;
 }
-QLabel#cover_label {
+/* 封面控件 _ClickableLabel 继承 QWidget 而非 QLabel，
+   必须用纯 id 选择器，带 QLabel 前缀会因类型不匹配而不命中 */
+#cover_label {
     border: 1px solid #E0E0E0;
     background: #F5F5F5;
     border-radius: 6px;
 }
-QLabel#cover_label:hover {
+#cover_label:hover {
     background: #E3F2FD;
     border-color: #1976D2;
 }
