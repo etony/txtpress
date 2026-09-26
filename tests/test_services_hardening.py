@@ -57,23 +57,58 @@ def test_save_cover_tolerates_none_id(make_epub, tmp_path):
     assert (tmp_path / 'cover.png').exists()
 
 
-def test_mobi_html_merge_order(tmp_path, monkeypatch):
-    """混合 .htm/.html 时按文件名合并排序，.htm 不全排在 .html 之后。"""
+def _fake_mobi_extract(tmp_path, monkeypatch, files: dict):
+    """伪造 mobi.extract：在临时目录生成给定文件并打桩返回。"""
     import mobi
-    from services import convert_mobi_to_txt
 
     fake_dir = tmp_path / 'extracted'
-    fake_dir.mkdir()
-    (fake_dir / 'chapter1.htm').write_text('part1', encoding='utf-8')
-    (fake_dir / 'chapter2.html').write_text('part2', encoding='utf-8')
-    (fake_dir / 'chapter10.htm').write_text('part10', encoding='utf-8')
+    fake_dir.mkdir(exist_ok=True)
+    for name, text in files.items():
+        (fake_dir / name).write_text(text, encoding='utf-8')
     monkeypatch.setattr(mobi, 'extract', lambda p: (str(fake_dir), None))
+    return fake_dir
+
+
+def _run_mobi_txt(tmp_path) -> list[str]:
+    from services import convert_mobi_to_txt
 
     out = convert_mobi_to_txt(tmp_path / 'in.mobi', tmp_path / 'out.txt')
-    lines = Path(out).read_text(encoding='utf-8').splitlines()
-    # 按文件名字典序：chapter1.htm < chapter10.htm < chapter2.html
-    # 旧实现按扩展名分组输出为 part2/part1/part10（.htm 全排最后）
-    assert lines == ['part1', 'part10', 'part2']
+    return Path(out).read_text(encoding='utf-8').splitlines()
+
+
+def test_mobi_html_merge_order(tmp_path, monkeypatch):
+    """混合 .htm/.html 时按自然序合并排序，part10 不排到 part2 前面。"""
+    _fake_mobi_extract(tmp_path, monkeypatch, {
+        'chapter1.htm': 'part1',
+        'chapter2.html': 'part2',
+        'chapter10.htm': 'part10',
+    })
+    # 自然序按数字段数值比较：1 < 2 < 10
+    # 旧实现按扩展名分组输出 part2/part1/part10（.htm 全排最后）
+    assert _run_mobi_txt(tmp_path) == ['part1', 'part2', 'part10']
+
+
+def test_mobi_html_merge_interleaved(tmp_path, monkeypatch):
+    """.htm 与 .html 交错命名时仍保持自然序，不按扩展名分组。"""
+    _fake_mobi_extract(tmp_path, monkeypatch, {
+        'a1.htm': 'x1',
+        'a2.html': 'x2',
+        'a10.htm': 'x10',
+    })
+    # a1.htm < a2.html < a10.htm（自然序），旧实现会把 .htm 全挤到 .html 之后
+    assert _run_mobi_txt(tmp_path) == ['x1', 'x2', 'x10']
+
+
+def test_mobi_html_merge_mixed_names(tmp_path, monkeypatch):
+    """无数字与有数字文件名混合不触发 TypeError，顺序仍确定。"""
+    _fake_mobi_extract(tmp_path, monkeypatch, {
+        'text10.htm': 't10',
+        'cover.html': 'cv',
+        'text2.htm': 't2',
+        'text1.htm': 't1',
+    })
+    # cover 无数字段，与 text* 首段比较均为 str，不产生 str/int 比较
+    assert _run_mobi_txt(tmp_path) == ['cv', 't1', 't2', 't10']
 
 
 def test_extract_mobi_metadata_raises_on_failure(tmp_path):

@@ -946,10 +946,15 @@ def convert_mobi_to_txt(
     tmpdir = Path(tmpdir)
 
     try:
-        # .html 与 .htm 合并后按文件名排序，避免 .htm 全部排到最后
+        # .html 与 .htm 合并后按文件名自然序排序：
+        # 先避免 .htm 全排到最后；再按数字段比较，
+        # 保证 text2.htm 排在 text10.htm 之前（字典序会把 text10 插到 text2 前，≥10 章章节错乱）
+        def _natural_key(p):
+            return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', p.name)]
+
         html_files = sorted(
             list(tmpdir.rglob('*.html')) + list(tmpdir.rglob('*.htm')),
-            key=lambda p: p.name,
+            key=_natural_key,
         )
         if not html_files:
             raise RuntimeError('未能在解压目录里找到 html 文件')

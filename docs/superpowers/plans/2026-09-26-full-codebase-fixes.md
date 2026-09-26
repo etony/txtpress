@@ -1820,12 +1820,22 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
 改为：
 
 ```python
-        # .html 与 .htm 合并后按文件名排序，避免 .htm 全部排到最后
+        # .html 与 .htm 合并后按文件名自然序排序：
+        # 先避免 .htm 全排到最后；再按数字段比较，
+        # 保证 text2.htm 排在 text10.htm 之前（字典序会把 text10 插到 text2 前，≥10 章章节错乱）
+        def _natural_key(p):
+            return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', p.name)]
+
         html_files = sorted(
             list(tmpdir.rglob('*.html')) + list(tmpdir.rglob('*.htm')),
-            key=lambda p: p.name,
+            key=_natural_key,
         )
 ```
+
+> **计划修订（评审发现）:** 原 `key=lambda p: p.name` 是纯字典序，`part10` 会排在 `part2` 之前，
+> 没有真正修掉"章节错乱"（MOBI 章节名常见 `text1.htm`…`text10.htm`）。改自然序。
+> 注意 `re.split(r'(\d+)', ...)` 的捕获组使列表恒为 str/num 交替，同位置类型可比，无 TypeError。
+
 
 - [ ] **Step 7: extract_mobi_metadata 失败时抛错（不再静默空字段）**
 
