@@ -117,6 +117,30 @@ def _text_to_html(text: str) -> str:
     )
 
 
+def validate_chapter_regex(pattern: str) -> re.Pattern:
+    """校验章节正则：必须能编译，且恰好含 1 个捕获组。
+
+    re.split 靠捕获组把标题带回结果列表（[前言, 标题, 正文, ...] 交替），
+    0 个组会把正文当标题，2 个组会元素错位，必须在入口拦住。
+
+    Returns:
+        编译好的正则对象（调用方可复用）
+
+    Raises:
+        ValueError: 语法错误或捕获组数量不为 1
+    """
+    try:
+        compiled = re.compile(pattern, re.M)
+    except re.error as e:
+        raise ValueError(f'无效的正则表达式: {pattern}\n{e}') from e
+    if compiled.groups != 1:
+        raise ValueError(
+            f'章节正则必须包含且仅包含 1 个捕获组（括号），'
+            f'当前有 {compiled.groups} 个: {pattern}'
+        )
+    return compiled
+
+
 # =====================================================================
 # Txt2Epub — TXT → EPUB
 # =====================================================================
@@ -210,6 +234,8 @@ class Txt2Epub:
         )
         if cache_valid:
             return
+        # 先校验正则（能编译且恰好 1 个捕获组），无效就不必读文件了
+        compiled = validate_chapter_regex(self.regex)
         # 记录当前参数，下次调用时判断缓存是否仍然有效
         self._cached_path = self.txt_path
         self._cached_encoding = self.encoding
@@ -220,10 +246,7 @@ class Txt2Epub:
             # 捕获的内容也会被包含在结果列表中。
             # 这就是为什么结果交替出现 文本 / 标题 / 文本 / 标题 ...
             # re.M（MULTILINE）让 ^ 匹配每行开头，而不只是字符串开头。
-            try:
-                self._splits = re.split(self.regex, content, flags=re.M)
-            except re.error as e:
-                raise ValueError(f'无效的正则表达式: {self.regex}\n{e}')
+            self._splits = compiled.split(content)
 
     def get_chapters(self) -> list[str]:
         """

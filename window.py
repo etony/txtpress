@@ -57,7 +57,10 @@ from pathlib import Path
 from opencc import OpenCC
 
 from models import AppConfig, BookInfo
-from services import Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt, DEFAULT_CHAPTER_REGEX
+from services import (
+    Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt,
+    DEFAULT_CHAPTER_REGEX, validate_chapter_regex,
+)
 from worker import ProgressWorker
 from dialogs import ChapterDialog, AboutDialog
 from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS, FONT_PRESETS, TOC_STYLES
@@ -1025,6 +1028,12 @@ class MainWindow(QMainWindow):
         reg = self._te_reg.text().strip()
         if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
+        # 启动后台线程前先校验正则，避免错误延迟到 worker 里才弹窗
+        try:
+            validate_chapter_regex(conv.regex)
+        except ValueError as e:
+            QMessageBox.warning(self, '提示', str(e))
+            return
         # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
         # 别的章节（索引通常仍合法，补尾救不了），直接丢弃本次顺序
         order = self._ordered_chapters
