@@ -719,15 +719,15 @@ class Epub2Txt:
             progress: 进度回调 (current, total)
             status:   状态回调 (message)
         """
+        # 先确保输出目录存在，再提取封面（顺序反了目录不存在会 FileNotFoundError）
+        out_dir = os.path.dirname(self.txt_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
         self._save_cover_if_exists()
 
         docs = self._get_content_items()
         total = len(docs)
-
-        # 确保输出目录存在
-        out_dir = os.path.dirname(self.txt_path)
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
 
         with open(self.txt_path, 'w', encoding=self.encoding) as f:
             for idx, item in enumerate(docs, start=1):
@@ -761,8 +761,8 @@ class Epub2Txt:
             status:   状态回调 (message)
         """
         out_dir = os.path.dirname(self.txt_path)
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
 
         self._save_cover_if_exists()
 

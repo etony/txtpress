@@ -31,3 +31,20 @@ def test_convert_chapter_ignores_sep(make_epub, tmp_path):
     for f in files:
         assert '---' not in f.read_text(encoding='utf-8')
     assert conv.sep == '\n---\n'  # 导出结束后 sep 应恢复原值
+
+
+def test_convert_creates_missing_outdir_with_cover(make_epub, tmp_path):
+    """输出目录不存在 + 有封面时也应成功（先建目录再存封面）。"""
+    out = str(tmp_path / 'newdir' / 'o.txt')
+    conv = Epub2Txt(make_epub(with_cover=True), out)
+    conv.convert()
+    assert Path(out).exists()
+    assert (tmp_path / 'newdir' / 'cover.jpeg').exists()
+
+
+def test_convert_chapter_outdir_empty(make_epub, tmp_path, monkeypatch):
+    """txt_path 无目录部分（如 out.txt）时不能因 makedirs('') 崩溃。"""
+    monkeypatch.chdir(tmp_path)
+    conv = Epub2Txt(make_epub(), 'base.txt')
+    conv.convert_chapter()
+    assert (tmp_path / 'base1.txt').exists()
