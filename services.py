@@ -593,13 +593,22 @@ class Epub2Txt:
         """
         os.makedirs(output_dir, exist_ok=True)
         extracted = []
+        used: set[str] = set()
         for item in self._book.get_items():
             if item.get_type() == ebooklib.ITEM_IMAGE:
                 name = os.path.basename(item.get_name())
-                out = os.path.join(output_dir, name)
+                stem, ext = os.path.splitext(name)
+                candidate = name
+                n = 2
+                # 不同子目录可能有同名图片，加序号防止相互覆盖
+                while candidate in used:
+                    candidate = f'{stem}_{n}{ext}'
+                    n += 1
+                used.add(candidate)
+                out = os.path.join(output_dir, candidate)
                 with open(out, 'wb') as f:
                     f.write(item.get_content())
-                extracted.append(name)
+                extracted.append(candidate)
         return extracted
 
     # ---- 元信息修改 ----
@@ -657,7 +666,21 @@ class Epub2Txt:
                         break
             if not replaced:
                 self._book.set_cover('cover.jpeg', info.cover)
-        epub.write_epub(filepath or self.epub_path, self._book, {})
+        # 先写临时文件再原子替换：
+        # write_epub 会先 truncate 目标文件，中途失败（磁盘满/断电）
+        # 会留下损坏文件，而这通常是用户的唯一副本
+        target = filepath or self.epub_path
+        tmp_path = target + '.tmp'
+        try:
+            epub.write_epub(tmp_path, self._book, {})
+            os.replace(tmp_path, target)
+        except Exception:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            raise
 
     # ---- 提取封面图片到磁盘 ----
 
@@ -678,7 +701,10 @@ class Epub2Txt:
         for item in self._book.get_items():
             is_cover_type = item.get_type() in (
                 ebooklib.ITEM_IMAGE, ebooklib.ITEM_COVER)
-            is_cover_name = ('cover' in item.get_name() or 'cover' in item.id)
+            is_cover_name = (
+                'cover' in item.get_name()
+                or 'cover' in str(item.id or '')
+            )
             if is_cover_type and is_cover_name:
                 _, ext = os.path.splitext(item.get_name())
                 out = os.path.join(self._dir, f'cover{ext}')
@@ -705,13 +731,18 @@ class Epub2Txt:
             处理后的纯文本字符串
         """
         # EPUB规范要求XHTML使用UTF-8编码，不应用用户指定的输出编码
-        soup = BeautifulSoup(item.get_content().decode('utf-8'), 'html.parser')
+        # 但存在不规范文件；解码失败用替换字符兜底，
+        # 不让单个文档毁掉整次转换
+        soup = BeautifulSoup(
+            item.get_content().decode('utf-8', errors='replace'),
+            'html.parser',
+        )
         for tag in soup.find_all(['h1', 'h2', 'h3', 'h4']):
             tag.insert_after(soup.new_string('\n'))
             break  # 只在第一个标题后加换行
         text = self._cc.convert(soup.get_text()) if fanjian else soup.get_text()
         text = text.rstrip('\n') + '\n'
-        # 分隔符追加到每章文本末尾（'（无）'时 window 不赋值，保持默认空串）
+        # 分隔符追加到每章文本末尾（未设置时 sep 为空串，不追加）
         if self.sep:
             text += self.sep
         return text
@@ -915,8 +946,11 @@ def convert_mobi_to_txt(
     tmpdir = Path(tmpdir)
 
     try:
-        # 找到所有 HTML 文件（包括 .htm），按文件名排序
-        html_files = sorted(tmpdir.rglob('*.html')) + sorted(tmpdir.rglob('*.htm'))
+        # .html 与 .htm 合并后按文件名排序，避免 .htm 全部排到最后
+        html_files = sorted(
+            list(tmpdir.rglob('*.html')) + list(tmpdir.rglob('*.htm')),
+            key=lambda p: p.name,
+        )
         if not html_files:
             raise RuntimeError('未能在解压目录里找到 html 文件')
 
@@ -998,7 +1032,9 @@ def extract_mobi_metadata(mobi_path: Path) -> dict:
             
     except Exception as e:
         logger.error(f'提取 MOBI 元数据失败: {e}')
-    
+        # 不再静默吞错：让 UI 层弹出可读的错误提示
+        raise RuntimeError(f'无法读取 MOBI 元数据: {e}') from e
+
     return metadata
 
 
