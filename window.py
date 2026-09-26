@@ -1482,6 +1482,9 @@ class MainWindow(QMainWindow):
 
     def _on_shortcut_convert(self):
         """Ctrl+Enter: 执行当前 tab 的转换。"""
+        if self._is_busy():
+            self.statusBar().showMessage('已有转换任务进行中…')
+            return
         idx = self._tabs.currentIndex()
         if idx == 0:
             self._on_convert_tab1()
@@ -1492,6 +1495,8 @@ class MainWindow(QMainWindow):
 
     def _on_shortcut_open(self):
         """Ctrl+O: 打开文件（根据当前 tab 选择文件类型）。"""
+        if self._is_busy():
+            return
         idx = self._tabs.currentIndex()
         if idx == 0:
             self._on_browse_txt()
@@ -1502,6 +1507,8 @@ class MainWindow(QMainWindow):
 
     def _on_shortcut_reset(self):
         """Ctrl+R: 重置当前 tab。"""
+        if self._is_busy():
+            return
         idx = self._tabs.currentIndex()
         if idx == 0:
             self._on_reset_tab1()
@@ -1600,6 +1607,10 @@ class MainWindow(QMainWindow):
     # 后台线程管理
     # ================================================================
 
+    def _is_busy(self) -> bool:
+        """是否有后台任务正在运行。"""
+        return self._worker is not None and self._worker.isRunning()
+
     def _run_worker(self, target, success_msg: str, dir_to_open: str):
         """
         启动后台线程执行耗时转换。
@@ -1624,6 +1635,11 @@ class MainWindow(QMainWindow):
             success_msg: 成功后的状态栏消息
             dir_to_open: 成功后询问是否打开的目录
         """
+
+        if self._is_busy():
+            self.statusBar().showMessage('已有转换任务进行中，请等待完成或取消')
+            logger.warning('忽略重复启动的后台任务')
+            return
 
         # ---- 信号处理闭包 ----
         # 闭包可以访问 self（外部函数的 __init__ 中定义的控件），
@@ -1809,10 +1825,18 @@ class MainWindow(QMainWindow):
                 self._cb_toc_style.setCurrentIndex(idx)
 
     def closeEvent(self, event):
-        """窗口关闭时自动保存配置。
+        """窗口关闭时取消运行中的任务并保存配置。
 
         QMainWindow 内置了 closeEvent，重写它可以在窗口关闭前执行清理操作。
         注意一定要调用 super().closeEvent(event)，否则窗口关不掉。
+
+        先 cancel 再 wait(3秒)：让 worker 尽快结束，
+        避免 "QThread destroyed while running"。
+        超时则放行（不阻塞用户退出）。
         """
+        if self._is_busy():
+            self._worker.cancel()
+            if not self._worker.wait(3000):
+                logger.warning('后台任务未能在 3 秒内结束，强制退出')
         self._save_config()
         super().closeEvent(event)
