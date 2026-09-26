@@ -1693,7 +1693,8 @@ class MainWindow(QMainWindow):
             if tot > 0:
                 self._progress_bar.setRange(0, tot)
                 self._progress_bar.setValue(cur)
-            self._progress_bar.setVisible(True)
+            if show_progress:
+                self._progress_bar.setVisible(True)
 
         def _status(msg):
             """更新状态栏文本。"""
@@ -1720,7 +1721,14 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage('已取消')
             elif ok:
                 if on_success is not None:
-                    on_success()
+                    try:
+                        on_success()
+                    except Exception as e:
+                        # 回填逻辑异常不能让进程闪退，走既有失败弹窗分支
+                        logger.exception('任务回填处理失败')
+                        QMessageBox.critical(self, '错误', f'{fail_msg}:\n{e}')
+                        self.statusBar().showMessage(fail_msg)
+                        return
                 if success_msg:
                     logger.info(success_msg)
                     self.statusBar().showMessage(success_msg)

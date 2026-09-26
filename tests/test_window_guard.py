@@ -14,6 +14,7 @@ Task 12：on_success 回调时机、fail_msg 文案、show_progress 显隐，
 """
 import os
 import sys
+import threading
 import time
 import unittest.mock as mock
 
@@ -64,6 +65,11 @@ def main_window(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(wmod, 'CONFIG_PATH', str(tmp_path / 'config.json'))
     win = wmod.MainWindow()
     yield win
+    # 端到端用例超时时 worker 可能还在跑：先 cancel+wait，
+    # 避免 "QThread destroyed while running" 把断言失败升级成进程崩溃
+    if win._worker is not None:
+        win._worker.cancel()
+        win._worker.wait(2000)
     win._worker = None
     win._closing = False
     win.close()
@@ -327,3 +333,83 @@ def test_load_epub_file_fills_fields_via_worker(main_window, qapp,
     assert main_window._tabs.isEnabled() is True
     assert main_window._progress_bar.isHidden() is True
     assert main_window._cancel_btn.isHidden() is True
+
+
+def _wait_worker(main_window, qapp, timeout=15):
+    """轮询事件循环直到 _done 清空 worker 引用（真实后台线程）。"""
+    deadline = time.time() + timeout
+    while main_window._worker is not None and time.time() < deadline:
+        qapp.processEvents()
+        time.sleep(0.01)
+
+
+def test_done_survives_on_success_exception(main_window, monkeypatch):
+    """on_success 抛异常：进程不闪退，走 fail_msg 弹窗且后续步骤不执行。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+
+    def boom():
+        raise RuntimeError('回填炸了')
+
+    main_window._run_worker(lambda p, s: None, success_msg='不该出现',
+                            dir_to_open='/tmp/out', on_success=boom)
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit, \
+            mock.patch.object(main_window, '_ask_open_dir') as ask:
+        done(True, '', False)   # 不应向外抛异常
+
+    crit.assert_called_once()
+    assert '转换失败' in crit.call_args.args[2]
+    assert '回填炸了' in crit.call_args.args[2]
+    assert main_window.statusBar().currentMessage() == '转换失败'
+    ask.assert_not_called()
+    assert main_window._tabs.isEnabled() is True
+    assert main_window._worker is None
+
+
+def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
+    """端到端：_on_extract_images 真 worker 提取图片，on_success 在主线程弹窗。"""
+    path = make_epub(images=['pic.png'])
+    main_window._le_in_epub.setText(path)
+    out_dir = os.path.join(os.path.dirname(path), 'images')
+    seen = {}
+
+    def _question(*args, **kwargs):
+        seen['thread'] = threading.get_ident()
+        seen['msg'] = args[2]
+        return wmod.QMessageBox.StandardButton.No   # 不打开目录
+
+    with mock.patch.object(wmod.QMessageBox, 'question', side_effect=_question), \
+            mock.patch.object(wmod.QMessageBox, 'information') as info, \
+            mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        main_window._on_extract_images()
+        _wait_worker(main_window, qapp)
+
+    crit.assert_not_called()
+    info.assert_not_called()
+    assert main_window._worker is None
+    # 弹窗由 on_success 发起：必须在主线程
+    assert seen['thread'] == threading.main_thread().ident
+    assert '成功提取 1 张图片' in seen['msg']
+    # box 路径完整走通：worker 真做了磁盘 IO
+    assert os.listdir(out_dir) == ['pic.png']
+    assert main_window._tabs.isEnabled() is True
+
+
+def test_extract_images_end_to_end_failure(main_window, qapp, tmp_path):
+    """端到端失败路径：坏 EPUB 走 fail_msg 弹窗与状态栏。"""
+    bad = tmp_path / 'bad.epub'
+    bad.write_bytes(b'not an epub at all')
+    main_window._le_in_epub.setText(str(bad))
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        main_window._on_extract_images()
+        _wait_worker(main_window, qapp)
+
+    crit.assert_called_once()
+    assert crit.call_args.args[2].startswith('提取失败:')
+    assert main_window.statusBar().currentMessage() == '提取失败'
+    assert main_window._worker is None
+    assert main_window._tabs.isEnabled() is True
