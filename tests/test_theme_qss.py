@@ -12,7 +12,8 @@
 """
 import os
 
-os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+# 像素断言依赖 offscreen 平台，强制指定（不被用户环境变量覆盖）
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 
 import pytest
 from PyQt6.QtCore import Qt
@@ -30,6 +31,13 @@ def qapp():
     if app is None:
         app = QApplication([])
     return app
+
+
+@pytest.fixture(autouse=True)
+def _reset_app_style(qapp):
+    """用例结束后清空全局样式表，避免深色主题残留污染后续测试模块。"""
+    yield
+    qapp.setStyleSheet('')
 
 
 def _light_qss():
