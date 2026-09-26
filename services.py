@@ -201,6 +201,27 @@ class Txt2Epub:
             with open(css_path, 'r', encoding='utf-8') as f:
                 self.css_style = f.read()
 
+    def apply_text_style(self, font_family: str, toc_marker: str) -> None:
+        """在 CSS 末尾追加正文字体与目录样式的覆盖规则。
+
+        为什么用追加而不是字符串替换？
+        default/minimal/modern 三个样式文件的 font-family 和
+        list-style-type 写法各不相同，定向 replace 会静默失效。
+        CSS 层叠规则：同优先级下后写的规则生效，追加即可全局覆盖。
+        """
+        overrides = []
+        if font_family:
+            overrides.append(f'body {{ font-family: {font_family}; }}')
+        if toc_marker:
+            overrides.append(
+                "nav[epub|type~='toc'] > ol > li > ol { "
+                f'list-style-type: {toc_marker}; }}'
+            )
+        if overrides:
+            self.css_style = (
+                self.css_style.rstrip() + '\n' + '\n'.join(overrides) + '\n'
+            )
+
     def set_chapter_order(self, ordered: list[tuple[int, str]] | None) -> None:
         """设置自定义章节顺序：[(原始索引, 新标题), ...]。
 

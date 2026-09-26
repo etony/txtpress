@@ -1053,23 +1053,11 @@ class MainWindow(QMainWindow):
         if os.path.exists(css_path):
             conv.load_css_from_file(css_path)
         
-        # 应用字体设置
-        font_name = self._cb_font.currentText()
-        if font_name in FONT_PRESETS:
-            font_css = FONT_PRESETS[font_name]
-            conv.css_style = conv.css_style.replace(
-                'font-family: Cambria, "Liberation Serif", Georgia, "Times New Roman", serif;',
-                f'font-family: {font_css};'
-            )
-        
-        # 应用目录样式
-        toc_style_name = self._cb_toc_style.currentText()
-        if toc_style_name in TOC_STYLES:
-            toc_marker = TOC_STYLES[toc_style_name]
-            conv.css_style = conv.css_style.replace(
-                'list-style-type: square;',
-                f'list-style-type: {toc_marker};'
-            )
+        # 应用正文字体和目录样式（追加覆盖规则，对所有样式文件都生效）
+        conv.apply_text_style(
+            FONT_PRESETS.get(self._cb_font.currentText(), ''),
+            TOC_STYLES.get(self._cb_toc_style.currentText(), ''),
+        )
 
         self._run_worker(
             target=conv.convert,

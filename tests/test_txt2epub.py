@@ -155,6 +155,28 @@ def test_progress_completes_without_preamble(tmp_path):
     assert calls[-1][1] == 2  # 无序章 total = 章节数
 
 
+def test_apply_text_style(sample_txt, tmp_path):
+    """追加覆盖规则必须生效，且不破坏原 CSS。"""
+    from services import Txt2Epub
+    conv = Txt2Epub(sample_txt, str(tmp_path / 's.epub'))
+    before = conv.css_style
+    conv.apply_text_style('SimHei, "Hei Ti", sans-serif', 'disc')
+    assert conv.css_style.startswith(before.rstrip('\n'))
+    assert 'font-family: SimHei, "Hei Ti", sans-serif;' in conv.css_style
+    assert 'list-style-type: disc;' in conv.css_style
+
+
+def test_apply_text_style_on_minimal_css(sample_txt, tmp_path):
+    """minimal.css 不含 Cambria/square 子串，追加方式仍应生效。"""
+    from services import Txt2Epub
+    styles = os.path.join(os.path.dirname(__file__), '..', 'styles')
+    conv = Txt2Epub(sample_txt, str(tmp_path / 'm.epub'))
+    conv.load_css_from_file(os.path.join(styles, 'minimal.css'))
+    conv.apply_text_style('KaiTi, serif', 'decimal')
+    assert 'font-family: KaiTi, serif;' in conv.css_style
+    assert 'list-style-type: decimal;' in conv.css_style
+
+
 def test_make_epub_variants(make_epub):
     """fixture 三种参数组合均能生成并回读 EPUB。"""
     from ebooklib import epub
