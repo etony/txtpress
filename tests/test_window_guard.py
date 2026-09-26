@@ -8,9 +8,13 @@
 
 Task 11 三态结果：task_done(成功, 错误消息, 是否被取消)，
 成功 / 失败 / 取消三条分支各自的 UI 行为。
+
+Task 12：on_success 回调时机、fail_msg 文案、show_progress 显隐，
+以及 _load_epub_file 迁移后的真实 worker 端到端回填。
 """
 import os
 import sys
+import time
 import unittest.mock as mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -209,3 +213,117 @@ def test_shortcuts_blocked_when_busy(main_window):
     browse.assert_not_called()
     reset.assert_not_called()
     assert main_window.statusBar().currentMessage() == '已有转换任务进行中…'
+
+
+# ================================================================
+# Task 12：on_success / fail_msg / show_progress / 迁移端到端
+# ================================================================
+
+
+def test_done_calls_on_success_before_ask_open_dir(main_window, monkeypatch):
+    """成功：on_success 先于状态栏消息与打开目录询问执行。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    order = []
+    on_success = mock.Mock(side_effect=lambda: order.append('on_success'))
+    main_window._run_worker(lambda p, s: None, success_msg='搞定',
+                            dir_to_open='/tmp/out', on_success=on_success)
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(main_window, '_ask_open_dir',
+                          side_effect=lambda d: order.append('ask')):
+        done(True, '', False)
+
+    assert order == ['on_success', 'ask']
+    assert main_window.statusBar().currentMessage() == '搞定'
+    assert main_window._worker is None
+
+
+def test_done_skips_on_success_on_failure(main_window, monkeypatch):
+    """失败：on_success 不执行，弹窗与状态栏都用 fail_msg 文案。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    on_success = mock.Mock()
+    main_window._run_worker(lambda p, s: None,
+                            on_success=on_success, fail_msg='读取失败')
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+
+    on_success.assert_not_called()
+    assert '读取失败' in crit.call_args.args[2]
+    assert 'boom' in crit.call_args.args[2]
+    assert main_window.statusBar().currentMessage() == '读取失败'
+    assert main_window._worker is None
+
+
+def test_show_progress_false_keeps_controls_hidden(main_window, monkeypatch):
+    """show_progress=False：进度条与取消按钮保持隐藏，tabs 仍被禁用。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None, show_progress=False)
+
+    assert main_window._progress_bar.isHidden() is True
+    assert main_window._cancel_btn.isHidden() is True
+    assert main_window._tabs.isEnabled() is False
+    assert main_window._is_busy() is True
+
+
+def test_show_progress_true_shows_cancel_button(main_window, monkeypatch):
+    """默认 show_progress=True：取消按钮照旧显示（旧行为保持）。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None)
+
+    assert main_window._cancel_btn.isHidden() is False
+    assert main_window._cancel_btn.text() == '取消'
+    assert main_window._cancel_btn.isEnabled() is True
+
+
+def test_done_resets_cancel_button_state(main_window, monkeypatch):
+    """_done 后取消按钮复位为"取消/可用/隐藏"（Task 10 评审项）。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None)
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+
+    # 模拟用户点过取消：按钮进入"取消中…"禁用态
+    main_window._on_cancel_clicked()
+    assert main_window._cancel_btn.text() == '取消中…'
+    assert main_window._cancel_btn.isEnabled() is False
+
+    with mock.patch.object(main_window, '_ask_open_dir'):
+        done(True, '', False)
+
+    assert main_window._cancel_btn.text() == '取消'
+    assert main_window._cancel_btn.isEnabled() is True
+    assert main_window._cancel_btn.isHidden() is True
+
+
+def test_load_epub_file_fills_fields_via_worker(main_window, qapp,
+                                                 make_epub):
+    """端到端：_load_epub_file 用真实 worker 线程读取 EPUB 并回填 UI。
+
+    覆盖迁移后的行为：字段填充、状态栏"已加载: …"、tabs 重开、
+    show_progress=False 下进度条/取消按钮不显示。
+    """
+    path = make_epub()
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        main_window._load_epub_file(path)
+        # 轮询事件循环直到 _done 清空 worker 引用（真实后台线程）
+        deadline = time.time() + 15
+        while main_window._worker is not None and time.time() < deadline:
+            qapp.processEvents()
+            time.sleep(0.01)
+
+    crit.assert_not_called()
+    assert main_window._worker is None
+    assert main_window._le_in_epub.text() == path
+    assert main_window._le_out_txt.text().endswith('.txt')
+    assert main_window._le_book_title.text() == '测试书'
+    assert main_window.statusBar().currentMessage().startswith('已加载')
+    assert main_window._tabs.isEnabled() is True
+    assert main_window._progress_bar.isHidden() is True
+    assert main_window._cancel_btn.isHidden() is True

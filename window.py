@@ -1132,25 +1132,16 @@ class MainWindow(QMainWindow):
             self._load_epub_file(path)
 
     def _load_epub_file(self, path: str):
-        """
-        加载 EPUB 文件到界面。
+        """加载 EPUB 文件到界面（元数据读取在后台线程执行）。
 
-        读取 EPUB 的元数据和封面，展示到对应的输入框中。
-        用户可以直接修改这些信息并通过"保存元信息"写回。
+        流程：预采集 UI 值 → worker 读取元数据/封面 →
+        on_success 在主线程回填输入框与封面。
 
         Args:
             path: EPUB 文件路径
-
-        提取流程：
-        1. 创建 Epub2Txt 实例（会同时读取 EPUB 到内存）
-        2. 用 get_info() 提取 DC 元数据
-        3. 用 get_cover() 提取封面图片
-        4. 填充到对应的 QLineEdit 和 _cover_label2
-
-        注意：
-        - 日期从 ISO 格式转为友好的显示格式（yyyy-mm-dd HH:MM:SS）
-        - 如果转换失败（错误的 EPUB 文件），弹出警告而不是崩溃
         """
+        if self._is_busy():
+            return
         self._le_in_epub.setText(path)
         self._epub_dir, fname = os.path.split(path)
         base, _ = os.path.splitext(fname)
@@ -1159,10 +1150,17 @@ class MainWindow(QMainWindow):
         txt_path = os.path.join(self._epub_dir, base + '.txt')
         self._le_out_txt.setText(txt_path)
 
-        # 提取元数据并填充到输入框
-        try:
+        self.statusBar().showMessage(f'正在读取: {fname}…')
+        box: dict = {}
+
+        def _read(progress, status):
+            status(f'正在读取: {fname}…')
             reader = Epub2Txt(path, txt_path)
-            info = reader.get_info()
+            box['info'] = reader.get_info()
+            box['cover'] = reader.get_cover()
+
+        def _fill():
+            info = box['info']
             self._le_book_title.setText(info.title)
             self._le_book_creator.setText(info.creator)
             self._le_book_contrib.setText(info.contributor)
@@ -1176,18 +1174,15 @@ class MainWindow(QMainWindow):
                     logger.debug(f'日期解析失败: {info.date} -> {e}')
                     self._le_book_date.setText(info.date)
             self._le_book_desc.setText(info.description)
-
-            # 加载封面图片
-            cover_data = reader.get_cover()
+            cover_data = box['cover']
             if cover_data:
                 img = QImage.fromData(cover_data)
                 self._cover_label2.setPixmap(QPixmap.fromImage(img))
-
             logger.info(f'EPUB 信息: {info}')
             self.statusBar().showMessage(f'已加载: {fname}')
-        except Exception as e:
-            QMessageBox.warning(self, '提示', f'读取 EPUB 失败:\n{e}')
-            logger.exception('加载 EPUB 失败')
+
+        self._run_worker(target=_read, on_success=_fill,
+                         fail_msg='读取失败', show_progress=False)
 
     def _on_browse_out_txt(self):
         """浏览——选择 TXT 保存路径。"""
@@ -1210,33 +1205,39 @@ class MainWindow(QMainWindow):
 
         流程：
         1. 验证 EPUB 文件存在
-        2. 创建 BookInfo 填入当前 UI 数据
-        3. 如果有新封面图片，读取其二进制数据
-        4. 调用 Epub2Txt.modi() 写回文件
+        2. 主线程创建 BookInfo 填入当前 UI 数据
+        3. worker 里读取新封面图片并调用 Epub2Txt.modi() 写回文件
         """
         epub_path = self._le_in_epub.text().strip()
         if not epub_path or not os.path.exists(epub_path):
             QMessageBox.warning(self, '提示', '请先选择 EPUB 文件')
             return
 
-        try:
-            reader = Epub2Txt(epub_path, self._le_out_txt.text() or '')
-            info = BookInfo(
-                title=self._le_book_title.text(),
-                creator=self._le_book_creator.text(),
-                contributor=self._le_book_contrib.text(),
-                date=self._le_book_date.text(),
-                description=self._le_book_desc.text(),
-            )
-            if self._epub_cover_path:
-                with open(self._epub_cover_path, 'rb') as f:
+        # 主线程构建数据；文件 IO 放 worker
+        info = BookInfo(
+            title=self._le_book_title.text(),
+            creator=self._le_book_creator.text(),
+            contributor=self._le_book_contrib.text(),
+            date=self._le_book_date.text(),
+            description=self._le_book_desc.text(),
+        )
+        cover_path = self._epub_cover_path
+        out_txt = self._le_out_txt.text() or ''
+
+        def _write(progress, status):
+            status('正在写入 EPUB 元信息…')
+            if cover_path:
+                with open(cover_path, 'rb') as f:
                     info.cover = f.read()
+            reader = Epub2Txt(epub_path, out_txt)
             reader.modi(info)
+
+        def _after():
             self.statusBar().showMessage('元信息保存完成')
             logger.info(f'元信息已更新: {epub_path}')
-        except Exception as e:
-            QMessageBox.critical(self, '错误', f'保存失败:\n{e}')
-            logger.exception('保存元信息失败')
+
+        self._run_worker(target=_write, on_success=_after,
+                         fail_msg='保存失败', show_progress=False)
 
     def _run_epub_to_txt(self, chapter_mode: bool):
         """EPUB→TXT 转换（合并/按章节通用入口）。
@@ -1258,19 +1259,23 @@ class MainWindow(QMainWindow):
 
         self._save_config()
 
-        reader = Epub2Txt(epub_path, txt_path)
-        if self._cb_out_code.currentIndex() != 0:
-            reader.encoding = self._cb_out_code.currentText()
+        # 主线程预采集 UI 值（worker 里不允许读控件）
+        encoding = self._cb_out_code.currentText()
         sep = self._cb_sep.currentText()
-        if sep and sep != '（无）':
-            reader.sep = sep.replace('\\n', '\n')
+        sep = sep.replace('\\n', '\n') if sep and sep != '（无）' else ''
         fanjian = self._chb_fanjian.isChecked()
 
-        target = reader.convert_chapter if chapter_mode else reader.convert
+        def _target(progress, status):
+            # EPUB 读取放后台线程，大文件不冻结界面
+            reader = Epub2Txt(epub_path, txt_path)
+            reader.encoding = encoding
+            reader.sep = sep
+            convert = reader.convert_chapter if chapter_mode else reader.convert
+            convert(fanjian=fanjian, progress=progress, status=status)
+
         msg = '按章节导出完成' if chapter_mode else 'EPUB→TXT 转换完成'
         self._run_worker(
-            target=lambda progress, status: target(
-                fanjian=fanjian, progress=progress, status=status),
+            target=_target,
             success_msg=msg,
             dir_to_open=os.path.dirname(txt_path),
         )
@@ -1301,11 +1306,16 @@ class MainWindow(QMainWindow):
             return
 
         out_dir = os.path.join(os.path.dirname(epub_path), 'images')
-        os.makedirs(out_dir, exist_ok=True)
 
-        try:
+        box: dict = {}
+
+        def _extract(progress, status):
+            status('正在提取图片…')
             reader = Epub2Txt(epub_path, '')
-            files = reader.extract_images(out_dir)
+            box['files'] = reader.extract_images(out_dir)
+
+        def _after():
+            files = box['files']
             if files:
                 msg = f'成功提取 {len(files)} 张图片到:\n{out_dir}'
                 logger.info(msg)
@@ -1318,9 +1328,9 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.information(self, '提取完成', '未找到图片')
                 logger.info('提取图片: 未找到图片')
-        except Exception as e:
-            QMessageBox.critical(self, '错误', f'提取失败:\n{e}')
-            logger.exception('提取图片失败')
+
+        self._run_worker(target=_extract, on_success=_after,
+                         fail_msg='提取失败', show_progress=False)
 
     def _on_fanjian_toggled(self, state):
         """
@@ -1397,23 +1407,33 @@ class MainWindow(QMainWindow):
             self._load_mobi_metadata(path)
 
     def _load_mobi_metadata(self, mobi_path: str):
-        """加载 MOBI 文件的书籍信息"""
+        """加载 MOBI 书籍信息（元数据与封面提取在后台线程执行）。"""
+        if self._is_busy():
+            return
         from services import extract_mobi_metadata, extract_mobi_cover
-        
-        metadata = extract_mobi_metadata(Path(mobi_path))
-        
-        # 填充信息字段
-        self._mobi_book_title.setText(metadata.get('title', ''))
-        self._mobi_book_author.setText(metadata.get('creator', ''))
-        self._mobi_book_publisher.setText(metadata.get('publisher', ''))
-        self._mobi_book_isbn.setText(metadata.get('isbn', ''))
-        self._mobi_book_language.setText(metadata.get('language', ''))
-        self._mobi_book_published.setText(metadata.get('published', ''))
-        
-        # 提取并显示封面
-        cover_offset = metadata.get('cover_offset')
-        if cover_offset is not None:
-            cover_data = extract_mobi_cover(Path(mobi_path), cover_offset)
+
+        box: dict = {}
+
+        def _read(progress, status):
+            status('正在读取 MOBI 信息…')
+            md = extract_mobi_metadata(Path(mobi_path))
+            box['md'] = md
+            offset = md.get('cover_offset')
+            box['cover'] = (
+                extract_mobi_cover(Path(mobi_path), offset)
+                if offset is not None else None
+            )
+
+        def _fill():
+            metadata = box['md']
+            self._mobi_book_title.setText(metadata.get('title', ''))
+            self._mobi_book_author.setText(metadata.get('creator', ''))
+            self._mobi_book_publisher.setText(metadata.get('publisher', ''))
+            self._mobi_book_isbn.setText(metadata.get('isbn', ''))
+            self._mobi_book_language.setText(metadata.get('language', ''))
+            self._mobi_book_published.setText(metadata.get('published', ''))
+
+            cover_data = box['cover']
             if cover_data:
                 pixmap = QPixmap()
                 if pixmap.loadFromData(cover_data):
@@ -1424,8 +1444,9 @@ class MainWindow(QMainWindow):
                     self._mobi_lbl_cover.setText('封面加载失败')
             else:
                 self._mobi_lbl_cover.setText('无封面')
-        else:
-            self._mobi_lbl_cover.setText('无封面')
+
+        self._run_worker(target=_read, on_success=_fill,
+                         fail_msg='读取 MOBI 失败', show_progress=False)
 
     def _on_refresh_mobi_info(self):
         """手动刷新 MOBI 文件的书籍信息"""
@@ -1621,9 +1642,11 @@ class MainWindow(QMainWindow):
         """
         return self._worker is not None
 
-    def _run_worker(self, target, success_msg: str, dir_to_open: str):
+    def _run_worker(self, target, success_msg: str = '', dir_to_open: str = '',
+                    on_success=None, fail_msg: str = '转换失败',
+                    show_progress: bool = True):
         """
-        启动后台线程执行耗时转换。
+        启动后台线程执行耗时操作。
 
         这是连接 UI 和 Worker 的关键方法：
         1. 创建 ProgressWorker，传入业务函数
@@ -1642,8 +1665,11 @@ class MainWindow(QMainWindow):
 
         Args:
             target: 业务函数，签名 target(progress, status)
-            success_msg: 成功后的状态栏消息
-            dir_to_open: 成功后询问是否打开的目录
+            success_msg: 成功后的状态栏消息（空则不显示）
+            dir_to_open: 成功后询问是否打开的目录（空则不询问）
+            on_success: 成功后在主线程执行的回调（用于回填 UI）
+            fail_msg: 失败时的提示前缀
+            show_progress: 是否显示进度条与取消按钮（元数据读取为 False）
         """
 
         # 关窗期间不启动新任务（此时 worker 可能刚被 _done 清空，
@@ -1683,6 +1709,9 @@ class MainWindow(QMainWindow):
 
             self._progress_bar.setVisible(False)
             self._cancel_btn.setVisible(False)
+            # 复位取消按钮，避免上一次"取消中…"状态带到下个任务
+            self._cancel_btn.setText('取消')
+            self._cancel_btn.setEnabled(True)
             self._tabs.setEnabled(True)
             self._worker = None
 
@@ -1690,21 +1719,26 @@ class MainWindow(QMainWindow):
                 logger.info('任务已取消')
                 self.statusBar().showMessage('已取消')
             elif ok:
-                logger.info(success_msg)
-                self.statusBar().showMessage(success_msg)
-                self._ask_open_dir(dir_to_open)
+                if on_success is not None:
+                    on_success()
+                if success_msg:
+                    logger.info(success_msg)
+                    self.statusBar().showMessage(success_msg)
+                if dir_to_open:
+                    self._ask_open_dir(dir_to_open)
             else:
-                QMessageBox.critical(self, '错误', f'转换失败:\n{err}')
-                self.statusBar().showMessage('转换失败')
+                QMessageBox.critical(self, '错误', f'{fail_msg}:\n{err}')
+                self.statusBar().showMessage(fail_msg)
 
         # ---- 启动线程 ----
         self._worker = ProgressWorker(target)
         self._worker.progress.connect(_progress)
         self._worker.status.connect(_status)
         self._worker.task_done.connect(_done)
-        self._cancel_btn.setVisible(True)
-        self._cancel_btn.setEnabled(True)
-        self._cancel_btn.setText('取消')
+        if show_progress:
+            self._cancel_btn.setVisible(True)
+            self._cancel_btn.setEnabled(True)
+            self._cancel_btn.setText('取消')
         self._tabs.setEnabled(False)  # 禁用标签页，防止用户重复点击
         self._worker.start()
 
