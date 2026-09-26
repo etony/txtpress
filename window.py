@@ -187,6 +187,7 @@ class MainWindow(QMainWindow):
         self._epub_dir = ''                        # 当前 EPUB 文件所在目录
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
+        self._closing = False                      # 是否正在关窗（关窗期间忽略任务回调/新任务）
         self._ordered_chapters: list[tuple[int, str]] | None = None  # ChapterDialog 调整后的章节 [(原始索引, 新标题)]
         self._ordered_chapters_src: tuple[str, str, str] | None = None  # _ordered_chapters 的来源指纹 (txt路径, 正则, 编码)
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
@@ -1496,6 +1497,7 @@ class MainWindow(QMainWindow):
     def _on_shortcut_open(self):
         """Ctrl+O: 打开文件（根据当前 tab 选择文件类型）。"""
         if self._is_busy():
+            self.statusBar().showMessage('已有转换任务进行中…')
             return
         idx = self._tabs.currentIndex()
         if idx == 0:
@@ -1508,6 +1510,7 @@ class MainWindow(QMainWindow):
     def _on_shortcut_reset(self):
         """Ctrl+R: 重置当前 tab。"""
         if self._is_busy():
+            self.statusBar().showMessage('已有转换任务进行中…')
             return
         idx = self._tabs.currentIndex()
         if idx == 0:
@@ -1608,8 +1611,15 @@ class MainWindow(QMainWindow):
     # ================================================================
 
     def _is_busy(self) -> bool:
-        """是否有后台任务正在运行。"""
-        return self._worker is not None and self._worker.isRunning()
+        """是否有后台任务尚未结束。
+
+        只判断 worker 引用是否还在，不看 isRunning()：
+        线程结束到 _done 在主线程执行之间存在间隙，此时 isRunning()
+        已为 False 但旧任务的 _done 还没跑，放行新任务会被旧 _done
+        clobber（把新 worker 置 None、重开 tabs）。
+        引用清空只发生在 _done 里，恰好覆盖整个间隙。
+        """
+        return self._worker is not None
 
     def _run_worker(self, target, success_msg: str, dir_to_open: str):
         """
@@ -1636,6 +1646,13 @@ class MainWindow(QMainWindow):
             dir_to_open: 成功后询问是否打开的目录
         """
 
+        # 关窗期间不启动新任务（此时 worker 可能刚被 _done 清空，
+        # 单看 _is_busy 会漏判）；单独判断而非并入 _is_busy，
+        # 避免把"关窗中"语义混进"忙"语义
+        if self._closing:
+            logger.warning('窗口关闭中，忽略启动后台任务的请求')
+            return
+
         if self._is_busy():
             self.statusBar().showMessage('已有转换任务进行中，请等待完成或取消')
             logger.warning('忽略重复启动的后台任务')
@@ -1658,6 +1675,12 @@ class MainWindow(QMainWindow):
 
         def _done(ok, err):
             """转换完成（成功或失败）。"""
+            if self._closing:
+                # 关窗流程已接管：worker 由 closeEvent 的 cancel+wait 处理，
+                # 此时弹窗/更新控件可能阻塞退出或访问已销毁的控件
+                logger.info('窗口关闭中，忽略任务结束回调')
+                return
+
             self._progress_bar.setVisible(False)
             self._cancel_btn.setVisible(False)
             self._tabs.setEnabled(True)
@@ -1833,7 +1856,10 @@ class MainWindow(QMainWindow):
         先 cancel 再 wait(3秒)：让 worker 尽快结束，
         避免 "QThread destroyed while running"。
         超时则放行（不阻塞用户退出）。
+
+        先置 _closing：让 _done 早退，防止关窗期间弹窗阻塞退出。
         """
+        self._closing = True
         if self._is_busy():
             self._worker.cancel()
             if not self._worker.wait(3000):
