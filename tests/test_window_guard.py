@@ -383,6 +383,7 @@ def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
     def _question(*args, **kwargs):
         seen['thread'] = threading.get_ident()
         seen['msg'] = args[2]
+        seen['buttons'] = args[3]   # Task 17：确认弹窗必须是 Yes|No
         return wmod.QMessageBox.StandardButton.No   # 不打开目录
 
     with mock.patch.object(wmod.QMessageBox, 'question', side_effect=_question), \
@@ -397,6 +398,8 @@ def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
     # 弹窗由 on_success 发起：必须在主线程
     assert seen['thread'] == threading.main_thread().ident
     assert '成功提取 1 张图片' in seen['msg']
+    assert seen['buttons'] == (wmod.QMessageBox.StandardButton.Yes
+                               | wmod.QMessageBox.StandardButton.No)
     # box 路径完整走通：worker 真做了磁盘 IO
     assert os.listdir(out_dir) == ['pic.png']
     assert main_window._tabs.isEnabled() is True

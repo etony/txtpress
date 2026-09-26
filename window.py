@@ -1012,7 +1012,7 @@ class MainWindow(QMainWindow):
             logger.exception('目录预览失败')
 
     def _on_reset_tab1(self):
-        """重置 tab1 的所有输入。"""
+        """重置 tab1 的所有输入（含选项组下拉，全部回到默认值）。"""
         for w in (self._le_txt, self._le_epub, self._le_title,
                   self._le_author, self._le_txt_contrib,
                   self._le_txt_date, self._le_txt_desc):
@@ -1020,11 +1020,19 @@ class MainWindow(QMainWindow):
         self._txt_cover = ''
         self._reset_cover(self._cover_label)
         self._cb_encode.setCurrentIndex(0)
+        # 选项组补齐：正则预设/EPUB 样式/正文字体/目录样式回到默认项。
+        # 预设必须先于 te_reg 重置（预设联动会写入 te_reg），
+        # 最后统一把正则设为默认值，保证两者状态一致
+        self._cb_regex_preset.setCurrentIndex(0)
+        self._cb_epub_style.setCurrentIndex(0)
+        self._cb_font.setCurrentIndex(0)
+        self._cb_toc_style.setCurrentIndex(0)
         self._detected_encoding = 'utf-8'
         self._detected_path = None
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self._ordered_chapters_src = None
+        self._txt_dir = ''  # 源文件目录缓存（浏览保存路径的默认目录）
         self._reset_status('tab1')
 
     def _on_convert_tab1(self):
@@ -1045,6 +1053,8 @@ class MainWindow(QMainWindow):
             return
         if not epub:
             QMessageBox.warning(self, '提示', '请指定 EPUB 保存路径')
+            return
+        if not self._confirm_output_path(txt, epub):
             return
 
         # 先校验最终会生效的正则（短于阈值回退默认），
@@ -1262,6 +1272,8 @@ class MainWindow(QMainWindow):
         if not txt_path:
             QMessageBox.warning(self, '提示', '请指定 TXT 保存路径')
             return
+        if not self._confirm_output_path(epub_path, txt_path):
+            return
 
         self._save_config()
 
@@ -1368,7 +1380,7 @@ class MainWindow(QMainWindow):
             self._le_out_txt.setText(os.path.join(d, base + '.txt'))
 
     def _on_reset_tab2(self):
-        """重置 tab2 的所有输入。"""
+        """重置 tab2 的所有输入（含输出选项下拉与目录缓存）。"""
         for w in (self._le_in_epub, self._le_out_txt, self._le_book_title,
                   self._le_book_creator, self._le_book_contrib,
                   self._le_book_date, self._le_book_desc):
@@ -1378,6 +1390,7 @@ class MainWindow(QMainWindow):
         self._cb_out_code.setCurrentIndex(0)
         self._cb_sep.setCurrentIndex(0)
         self._chb_fanjian.setChecked(False)
+        self._epub_dir = ''  # 源文件目录缓存（浏览保存路径的默认目录）
         self._reset_status('tab2')
 
     # ================================================================
@@ -1481,6 +1494,8 @@ class MainWindow(QMainWindow):
         if not txt_path:
             QMessageBox.warning(self, '提示', '请指定 TXT 保存路径')
             return
+        if not self._confirm_output_path(mobi_path, txt_path):
+            return
 
         def _do(progress, status):
             """后台执行 MOBI 转换的入口函数。"""
@@ -1502,8 +1517,8 @@ class MainWindow(QMainWindow):
                   self._mobi_book_isbn, self._mobi_book_language,
                   self._mobi_book_published):
             w.clear()
-        self._mobi_lbl_cover.clear()
-        self._mobi_lbl_cover.setText('')
+        # 恢复默认封面图（与初始状态一致，setPixmap 会清掉"无封面"等文字）
+        self._reset_cover(self._mobi_lbl_cover)
         self._reset_status('tab3')
 
     # ================================================================
@@ -1778,6 +1793,39 @@ class MainWindow(QMainWindow):
     # 辅助
     # ================================================================
 
+    def _confirm_output_path(self, in_path: str, out_path: str) -> bool:
+        """输出路径保护（计划 Task 17 Step 2）。
+
+        校验规则：
+        1. 输出路径不能与输入文件相同（防止就地覆盖源文件）
+        2. 输出目录必须已存在（不做隐式创建，避免手误建出目录）
+        3. 目标文件已存在时弹 Yes/No 覆盖确认
+
+        Args:
+            in_path: 输入文件路径（调用方已校验存在）
+            out_path: 输出文件路径（调用方已校验非空）
+
+        Returns:
+            True=允许继续转换；False=已提示并拒绝
+        """
+        if (os.path.normcase(os.path.abspath(out_path))
+                == os.path.normcase(os.path.abspath(in_path))):
+            QMessageBox.warning(self, '提示', '输出路径不能与输入文件相同')
+            return False
+        out_dir = os.path.dirname(out_path)
+        if out_dir and not os.path.isdir(out_dir):
+            QMessageBox.warning(self, '提示', f'输出目录不存在:\n{out_dir}')
+            return False
+        if os.path.exists(out_path):
+            if QMessageBox.question(
+                self, '确认覆盖',
+                f'目标文件已存在:\n{out_path}\n是否覆盖？',
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No,
+            ) != QMessageBox.StandardButton.Yes:
+                return False
+        return True
+
     def _ask_open_dir(self, dirname: str):
         """
         转换完成后弹窗询问是否打开输出目录。
@@ -1788,13 +1836,14 @@ class MainWindow(QMainWindow):
         """
         if not dirname or not os.path.isdir(dirname):
             return
+        # 确认弹窗用 Yes|No（而非 OK/Cancel）：问题语义是"是否打开"
         reply = QMessageBox(
             QMessageBox.Icon.Information,
             '信息',
             '转换完成，是否打开存储目录？',
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         ).exec()
-        if reply == QMessageBox.StandardButton.Ok:
+        if reply == QMessageBox.StandardButton.Yes:
             self._open_dir(dirname)
 
     @staticmethod
