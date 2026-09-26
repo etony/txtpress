@@ -136,7 +136,8 @@ def validate_chapter_regex(pattern: str) -> re.Pattern:
     if compiled.groups != 1:
         raise ValueError(
             f'章节正则必须包含且仅包含 1 个捕获组（括号），'
-            f'当前有 {compiled.groups} 个: {pattern}'
+            f'当前有 {compiled.groups} 个: {pattern}\n'
+            f'提示：请把要作为章节标题的部分用半角括号 () 包起来'
         )
     return compiled
 

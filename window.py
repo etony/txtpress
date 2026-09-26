@@ -1007,6 +1007,17 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, '提示', '请指定 EPUB 保存路径')
             return
 
+        # 先校验最终会生效的正则（短于阈值回退默认），
+        # 非法正则不写入 config，也避免错误延迟到 worker 里才弹窗
+        reg = self._te_reg.text().strip()
+        effective_regex = (reg if len(reg) >= _MIN_REGEX_LEN
+                           else DEFAULT_CHAPTER_REGEX)
+        try:
+            validate_chapter_regex(effective_regex)
+        except ValueError as e:
+            QMessageBox.warning(self, '提示', str(e))
+            return
+
         self._save_config()
 
         conv = Txt2Epub(txt, epub)
@@ -1025,15 +1036,8 @@ class MainWindow(QMainWindow):
             conv.cover_path = self._txt_cover
         if self._cb_encode.currentIndex() != 0:
             conv.encoding = self._cb_encode.currentText()
-        reg = self._te_reg.text().strip()
         if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
-        # 启动后台线程前先校验正则，避免错误延迟到 worker 里才弹窗
-        try:
-            validate_chapter_regex(conv.regex)
-        except ValueError as e:
-            QMessageBox.warning(self, '提示', str(e))
-            return
         # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
         # 别的章节（索引通常仍合法，补尾救不了），直接丢弃本次顺序
         order = self._ordered_chapters
