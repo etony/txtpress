@@ -191,6 +191,7 @@ class MainWindow(QMainWindow):
         self._ordered_chapters_src: tuple[str, str, str] | None = None  # _ordered_chapters 的来源指纹 (txt路径, 正则, 编码)
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
         self._detected_encoding = 'utf-8'          # chardet 检测到的输入编码
+        self._detected_path: str | None = None     # 检测值对应的文件路径（懒检测缓存键）
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
@@ -847,6 +848,21 @@ class MainWindow(QMainWindow):
         if path:
             self._load_txt_file(path)
 
+    def _detect_encoding(self, path: str) -> tuple[str, str] | None:
+        """读取文件前 _ENCODE_DETECT_SIZE 字节，用 chardet 检测编码。
+
+        返回 (编码, 语言)；文件不存在或读取失败返回 None，
+        由调用方决定是否缓存（失败不缓存，避免把错误结果钉死）。
+        """
+        try:
+            with open(path, 'rb') as f:
+                data = f.read(_ENCODE_DETECT_SIZE)
+        except OSError:
+            return None
+        # chardet.detect 可能返回 None 或字段缺失，需要安全兜底
+        info = chardet.detect(data) or {}
+        return info.get('encoding') or 'utf-8', info.get('language') or '未知'
+
     def _load_txt_file(self, path: str):
         """
         加载 TXT 文件到界面。
@@ -877,15 +893,11 @@ class MainWindow(QMainWindow):
 
         # 编码检测——读取文件前 4096 字节自动判断编码
         # chardet.detect 返回 {"encoding": "utf-8", "confidence": 0.99, ...}
-        # 注意：detect可能返回None或字段缺失，需要安全处理
-        with open(path, 'rb') as f:
-            data = f.read(_ENCODE_DETECT_SIZE)
-            info = chardet.detect(data) or {}
-            enc = info.get('encoding') or 'utf-8'
-            self._detected_encoding = enc
-            lang = info.get('language', '未知')
-            self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
-            logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
+        enc, lang = self._detect_encoding(path) or ('utf-8', '未知')
+        self._detected_encoding = enc
+        self._detected_path = path
+        self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
+        logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
 
         logger.info(f'选择 TXT: {path}')
 
@@ -895,9 +907,20 @@ class MainWindow(QMainWindow):
         "自动检测"（index=0）时返回 chardet 结果，
         否则返回用户手动选择的编码。检测失败回退 utf-8。
         """
-        if self._cb_encode.currentIndex() == 0:
-            return self._detected_encoding or 'utf-8'
-        return self._cb_encode.currentText()
+        if self._cb_encode.currentIndex() != 0:
+            return self._cb_encode.currentText()
+        # 手敲/粘贴路径不会经过 _load_txt_file，缓存的检测值可能属于
+        # 上一个文件，因此路径变化时懒检测一次并缓存；同路径不重复读盘
+        path = self._le_txt.text().strip()
+        if path != self._detected_path:
+            detected = self._detect_encoding(path)
+            if detected is None:
+                # 文件不存在/读取失败：不缓存，直接回退 utf-8，
+                # 避免沿用上一个文件的检测值
+                return 'utf-8'
+            self._detected_encoding = detected[0]
+            self._detected_path = path
+        return self._detected_encoding or 'utf-8'
 
     def _on_browse_epub(self):
         """浏览——选择 EPUB 保存路径（必须是 .epub 扩展名）。"""
@@ -993,6 +1016,7 @@ class MainWindow(QMainWindow):
         self._reset_cover(self._cover_label)
         self._cb_encode.setCurrentIndex(0)
         self._detected_encoding = 'utf-8'
+        self._detected_path = None
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self._ordered_chapters_src = None
