@@ -161,9 +161,14 @@ def test_apply_text_style(sample_txt, tmp_path):
     conv = Txt2Epub(sample_txt, str(tmp_path / 's.epub'))
     before = conv.css_style
     conv.apply_text_style('SimHei, "Hei Ti", sans-serif', 'disc')
+    block = (
+        '/* TxtPress override */\n'
+        'body { font-family: SimHei, "Hei Ti", sans-serif; }\n'
+        "nav[epub|type~='toc'] ol { list-style-type: disc; }"
+    )
     assert conv.css_style.startswith(before.rstrip('\n'))
-    assert 'font-family: SimHei, "Hei Ti", sans-serif;' in conv.css_style
-    assert 'list-style-type: disc;' in conv.css_style
+    # 补充：尾部必须是完整覆盖块（含标记注释与后代选择器）
+    assert conv.css_style.rstrip().endswith(block)
 
 
 def test_apply_text_style_on_minimal_css(sample_txt, tmp_path):
@@ -174,7 +179,39 @@ def test_apply_text_style_on_minimal_css(sample_txt, tmp_path):
     conv.load_css_from_file(os.path.join(styles, 'minimal.css'))
     conv.apply_text_style('KaiTi, serif', 'decimal')
     assert 'font-family: KaiTi, serif;' in conv.css_style
-    assert 'list-style-type: decimal;' in conv.css_style
+    # 后代选择器：产物 TOC 是扁平结构，旧的 > ol > li > ol 匹配 0 个元素
+    assert "nav[epub|type~='toc'] ol { list-style-type: decimal; }" in conv.css_style
+
+
+def test_apply_text_style_idempotent(sample_txt, tmp_path):
+    """重复调用应替换旧覆盖块，不重复追加。"""
+    from services import Txt2Epub
+    conv = Txt2Epub(sample_txt, str(tmp_path / 'id.epub'))
+    conv.apply_text_style('SimHei', 'disc')
+    conv.apply_text_style('KaiTi', 'decimal')
+    assert conv.css_style.count('/* TxtPress override */') == 1
+    assert 'font-family: KaiTi;' in conv.css_style
+    assert 'font-family: SimHei;' not in conv.css_style
+    assert 'list-style-type: disc;' not in conv.css_style
+
+
+def test_toc_style_end_to_end(sample_txt, tmp_path):
+    """产物级（Critical 1 回归防线）：
+    nav.xhtml 必须挂样式表链接，覆盖规则必须进入 nav.css。"""
+    from services import Txt2Epub
+    out = str(tmp_path / 'e2e.epub')
+    conv = Txt2Epub(sample_txt, out)
+    conv.apply_text_style('SimHei, sans-serif', 'disc')
+    conv.convert()
+    with zipfile.ZipFile(out) as z:
+        nav = z.read('EPUB/nav.xhtml').decode('utf-8')
+        css = z.read('EPUB/style/nav.css').decode('utf-8')
+    # 阻断点 A：目录页必须引用样式表
+    assert 'rel="stylesheet"' in nav
+    assert 'style/nav.css' in nav
+    # 阻断点 B：覆盖规则须以后代选择器形式落盘
+    assert 'body { font-family: SimHei, sans-serif; }' in css
+    assert "nav[epub|type~='toc'] ol { list-style-type: disc; }" in css
 
 
 def test_make_epub_variants(make_epub):

@@ -208,18 +208,30 @@ class Txt2Epub:
         default/minimal/modern 三个样式文件的 font-family 和
         list-style-type 写法各不相同，定向 replace 会静默失效。
         CSS 层叠规则：同优先级下后写的规则生效，追加即可全局覆盖。
+
+        幂等：覆盖块以 /* TxtPress override */ 标记开头，每次先删除
+        旧标记块再追加，重复调用不会堆叠重复规则。
         """
+        # 先删除旧的覆盖块（从标记注释到字符串末尾），保证幂等
+        marker = '/* TxtPress override */'
+        idx = self.css_style.find(marker)
+        if idx != -1:
+            self.css_style = self.css_style[:idx].rstrip() + '\n'
         overrides = []
         if font_family:
             overrides.append(f'body {{ font-family: {font_family}; }}')
         if toc_marker:
+            # 用后代选择器而非 > ol > li > ol：产物 nav.xhtml 的 TOC 是
+            # 扁平 <nav><ol><li><a>（无嵌套），子代选择器匹配 0 个元素；
+            # 后代选择器特异性 (0,1,2) 高于 default.css 的 ol { none }
             overrides.append(
-                "nav[epub|type~='toc'] > ol > li > ol { "
+                "nav[epub|type~='toc'] ol { "
                 f'list-style-type: {toc_marker}; }}'
             )
         if overrides:
             self.css_style = (
-                self.css_style.rstrip() + '\n' + '\n'.join(overrides) + '\n'
+                self.css_style.rstrip() + '\n\n' + marker + '\n'
+                + '\n'.join(overrides) + '\n'
             )
 
     def set_chapter_order(self, ordered: list[tuple[int, str]] | None) -> None:
@@ -327,7 +339,8 @@ class Txt2Epub:
         # NCX 是 EPUB 2 的目录格式，Nav 是 EPUB 3 的格式。
         # ebooklib 两者都添加，保障兼容性。
         book.add_item(epub.EpubNcx())
-        book.add_item(epub.EpubNav())
+        nav = epub.EpubNav()
+        book.add_item(nav)
 
         # 把 CSS 样式添加为 EPUB 的一个资源文件
         nav_css = epub.EpubItem(
@@ -337,6 +350,10 @@ class Txt2Epub:
             content=self.css_style,
         )
         book.add_item(nav_css)
+        # 目录页必须挂样式表，否则 nav.css 里的目录样式规则全部无效
+        # （ebooklib 只会把 item.links 输出到 nav.xhtml 的 <head>；
+        #   nav.xhtml 在 EPUB 根、css 在 style/ 下，相对路径 style/nav.css 成立）
+        nav.add_item(nav_css)
         # spine 定义了 EPUB 的阅读顺序；'cover' 是封面页占位符
         book.spine = ['cover'] if has_cover else []
 
