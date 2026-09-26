@@ -5,6 +5,9 @@
 1. busy 时 _run_worker 被挡且不替换 worker 引用
 2. 线程已结束、_done 未执行的间隙 _is_busy 仍为 True（竞态）
 3. _closing 置位后 _done 早退（不弹窗、不重开 tabs）
+
+Task 11 三态结果：task_done(成功, 错误消息, 是否被取消)，
+成功 / 失败 / 取消三条分支各自的 UI 行为。
 """
 import os
 import sys
@@ -25,7 +28,7 @@ class _FakeWorker:
         self.target = target
         self.progress = mock.Mock()
         self.status = mock.Mock()
-        self.finished = mock.Mock()
+        self.task_done = mock.Mock()
         self.running = False
         self.cancelled = False
 
@@ -91,7 +94,7 @@ def test_done_early_return_when_closing(main_window, monkeypatch):
     monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
     main_window._run_worker(lambda p, s: None, '成功消息', '')
     worker = main_window._worker
-    done = worker.finished.connect.call_args.args[0]
+    done = worker.task_done.connect.call_args.args[0]
 
     main_window._tabs.setEnabled(False)
     msg_before = main_window.statusBar().currentMessage()
@@ -106,14 +109,72 @@ def test_done_early_return_when_closing(main_window, monkeypatch):
     # 关窗期间任务结束信号到达
     with mock.patch.object(main_window, '_ask_open_dir') as ask, \
             mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        done(True, '')
-        done(False, 'boom')
+        done(True, '', False)
+        done(False, 'boom', False)
 
     ask.assert_not_called()
     crit.assert_not_called()
     assert main_window._tabs.isEnabled() is False  # 未被 _done 重新启用
     assert main_window._worker is worker
     assert main_window.statusBar().currentMessage() == msg_before
+
+
+def _run_and_get_done(main_window, monkeypatch, success_msg='成功消息'):
+    """启动一个假 worker，返回它的 task_done 槽函数。"""
+    monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
+    main_window._run_worker(lambda p, s: None, success_msg, '/tmp/out')
+    worker = main_window._worker
+    done = worker.task_done.connect.call_args.args[0]
+    return worker, done
+
+
+def test_done_success_branch(main_window, monkeypatch):
+    """成功：显示成功消息、询问打开目录、重开 tabs、清空 worker。"""
+    _, done = _run_and_get_done(main_window, monkeypatch, '全部搞定')
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(main_window, '_ask_open_dir') as ask, \
+            mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(True, '', False)
+
+    ask.assert_called_once_with('/tmp/out')
+    crit.assert_not_called()
+    assert main_window.statusBar().currentMessage() == '全部搞定'
+    assert main_window._tabs.isEnabled() is True
+    assert main_window._worker is None
+
+
+def test_done_cancelled_branch(main_window, monkeypatch):
+    """取消：状态栏"已取消"，不询问打开目录、不弹错误框。"""
+    _, done = _run_and_get_done(main_window, monkeypatch)
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(main_window, '_ask_open_dir') as ask, \
+            mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, '', True)
+
+    ask.assert_not_called()
+    crit.assert_not_called()
+    assert main_window.statusBar().currentMessage() == '已取消'
+    assert main_window._tabs.isEnabled() is True
+    assert main_window._worker is None
+
+
+def test_done_failure_branch(main_window, monkeypatch):
+    """失败：弹 QMessageBox.critical，状态栏"转换失败"，不询问打开目录。"""
+    _, done = _run_and_get_done(main_window, monkeypatch)
+    main_window._tabs.setEnabled(False)
+
+    with mock.patch.object(main_window, '_ask_open_dir') as ask, \
+            mock.patch.object(wmod.QMessageBox, 'critical') as crit:
+        done(False, 'boom', False)
+
+    ask.assert_not_called()
+    crit.assert_called_once()
+    assert 'boom' in crit.call_args.args[2]
+    assert main_window.statusBar().currentMessage() == '转换失败'
+    assert main_window._tabs.isEnabled() is True
+    assert main_window._worker is None
 
 
 def test_close_event_cancels_and_flags_closing(main_window):

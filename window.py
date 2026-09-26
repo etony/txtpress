@@ -1634,7 +1634,7 @@ class MainWindow(QMainWindow):
         信号连接原理：
         - worker.progress.connect(_progress)：子线程 emit 进度 → 主线程更新进度条
         - worker.status.connect(_status)：子线程 emit 状态 → 主线程更新状态栏
-        - worker.finished.connect(_done)：子线程结束 → 主线程恢复界面
+        - worker.task_done.connect(_done)：子线程结束 → 主线程恢复界面
 
         PyQt 的信号-槽机制自动处理线程切换：
         从子线程 emit 信号，槽函数在主线程执行（因为槽函数属于主线程的对象）。
@@ -1673,8 +1673,8 @@ class MainWindow(QMainWindow):
             """更新状态栏文本。"""
             self.statusBar().showMessage(msg)
 
-        def _done(ok, err):
-            """转换完成（成功或失败）。"""
+        def _done(ok, err, cancelled):
+            """任务结束（成功 / 失败 / 取消）。"""
             if self._closing:
                 # 关窗流程已接管：worker 由 closeEvent 的 cancel+wait 处理，
                 # 此时弹窗/更新控件可能阻塞退出或访问已销毁的控件
@@ -1686,7 +1686,10 @@ class MainWindow(QMainWindow):
             self._tabs.setEnabled(True)
             self._worker = None
 
-            if ok:
+            if cancelled:
+                logger.info('任务已取消')
+                self.statusBar().showMessage('已取消')
+            elif ok:
                 logger.info(success_msg)
                 self.statusBar().showMessage(success_msg)
                 self._ask_open_dir(dir_to_open)
@@ -1698,7 +1701,7 @@ class MainWindow(QMainWindow):
         self._worker = ProgressWorker(target)
         self._worker.progress.connect(_progress)
         self._worker.status.connect(_status)
-        self._worker.finished.connect(_done)
+        self._worker.task_done.connect(_done)
         self._cancel_btn.setVisible(True)
         self._cancel_btn.setEnabled(True)
         self._cancel_btn.setText('取消')

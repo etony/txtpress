@@ -17,7 +17,8 @@ PyQt 的界面（GUI）和后台任务不能在同一个线程里跑。
 取消机制：
 - 主线程调用 worker.cancel() 设置 _cancelled = True
 - 子线程的 progress 回调检查 _cancelled，如果为 True 则抛出 CancelledError
-- worker 捕获 CancelledError，当作正常完成处理
+- worker 捕获 CancelledError，通过 task_done 的第三态（是否被取消）上报，
+  既不算成功也不算失败
 
 学习要点：
   QThread 不能在子线程直接操作 UI 控件（会崩溃）。
@@ -34,7 +35,7 @@ PyQt 的界面（GUI）和后台任务不能在同一个线程里跑。
     worker = ProgressWorker(long_task)
     worker.progress.connect(lambda cur, tot: bar.setRange(0, tot) or bar.setValue(cur))
     worker.status.connect(lambda s: statusbar.showMessage(s))
-    worker.finished.connect(on_done)
+    worker.task_done.connect(on_done)
     worker.start()
 """
 
@@ -61,9 +62,9 @@ class ProgressWorker(QThread):
     通用后台工作线程，通过信号与主线程通信。
 
     三个信号的作用：
-    - progress: 更新进度条（当前值，总值）
-    - status:   更新状态栏文字
-    - finished: 任务结束通知（成功/失败，错误信息）
+    - progress:  更新进度条（当前值，总值）
+    - status:    更新状态栏文字
+    - task_done: 任务结束通知（成功, 错误消息, 是否被取消）
 
     业务方只需要提供一个 target 函数，签名是：
         target(progress, status, *args, **kwargs)
@@ -75,11 +76,11 @@ class ProgressWorker(QThread):
     这个 worker 把任务作为参数传入（策略模式），更灵活。
     """
 
-    # 定义信号。int,int 和 bool,str 是信号的参数类型。
-    # pyqtSignal 在类级别定义，是 PyQt 的元类机制自动处理的。
-    progress = pyqtSignal(int, int)   # (completed, total) 进度
-    status = pyqtSignal(str)          # 状态栏文本
-    finished = pyqtSignal(bool, str)  # (是否成功, 错误消息)
+    # 定义信号。pyqtSignal 在类级别定义，PyQt 元类自动处理。
+    # 注意：不能叫 finished——那会遮蔽 QThread 内置的 finished() 信号。
+    progress = pyqtSignal(int, int)          # (completed, total) 进度
+    status = pyqtSignal(str)                 # 状态栏文本
+    task_done = pyqtSignal(bool, str, bool)  # (成功, 错误消息, 是否被取消)
 
     def __init__(self, target, args=None, kwargs=None):
         """
@@ -114,7 +115,7 @@ class ProgressWorker(QThread):
             status('工作中')    -> 触发 self.status.emit('工作中')
 
         如果用户点了取消，progress 回调抛出 CancelledError，
-        run() 捕获后当作成功结束处理。
+        run() 捕获后以 task_done 的"被取消"状态上报（既非成功也非失败）。
 
         注意：lambda 里用 self 没问题，因为 run() 在子线程执行，
         而 self._cancelled 是跨线程共享的一个普通 Python 属性（线程安全不用担心，
@@ -136,12 +137,12 @@ class ProgressWorker(QThread):
                 **self._kwargs,
             )
             # 没有抛异常 => 成功
-            self.finished.emit(True, '')
+            self.task_done.emit(True, '', False)
         except CancelledError:
-            # 用户取消了，当做正常完成（不是错误）
-            self.finished.emit(True, '')
+            # 用户取消：既不是成功也不是错误，单独一种结果
+            self.task_done.emit(False, '', True)
         except Exception as e:
             # 任务抛异常了（比如文件不存在、编码错误等），
-            # 通过 finished 信号把异常信息传回主线程。
+            # 通过 task_done 信号把异常信息传回主线程。
             logger.exception('后台任务执行失败')
-            self.finished.emit(False, str(e))
+            self.task_done.emit(False, str(e), False)
