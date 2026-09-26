@@ -61,8 +61,16 @@ _STATUS_TITLE_LEN = 20
 
 def _load_default_css() -> str:
     """读取内置默认 EPUB 样式（styles/default.css）。"""
-    with open(os.path.join(STYLES_DIR, 'default.css'), encoding='utf-8') as f:
-        return f.read()
+    path = os.path.join(STYLES_DIR, 'default.css')
+    try:
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    except OSError as e:
+        # 启动期资源缺失要给出可恢复的指引（pythonw 下连 traceback 都看不到）
+        logger.exception(f'读取默认样式失败: {path}')
+        raise RuntimeError(
+            f'缺少样式文件 {path}，请恢复 styles 目录或重新获取程序文件'
+        ) from e
 
 
 # EPUB 内嵌的默认 CSS 样式

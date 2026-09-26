@@ -1,3 +1,4 @@
+/* @namespace 是 EPUB 3 必需的，声明 epub 前缀用于目录页选择器 */
 @namespace epub "http://www.idpf.org/2007/ops";
 body {
     font-family: Cambria, "Liberation Serif", Georgia, "Times New Roman", serif;
@@ -14,10 +15,12 @@ h2 {
     font-weight: bold; color: #D2691E; line-height: 240%;
     margin: 20px 0 0 0;
 }
+/* widows/orphans 控制段落分页时保留最少行数（提升阅读体验） */
 p {
     text-indent: 1.25em; margin: 0; widows: 2; orphans: 2;
 }
 ol { list-style-type: none; }
 ol > li:first-child { margin-top: 0.3em; }
+/* nav[epub|type~='toc'] 选择器匹配 EPUB 3 的目录页 */
 nav[epub|type~='toc'] > ol > li > ol { list-style-type: square; }
 nav[epub|type~='toc'] > ol > li > ol > li { margin-top: 0.3em; }

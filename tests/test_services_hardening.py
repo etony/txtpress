@@ -186,3 +186,17 @@ def test_modi_write_failure_keeps_original(make_epub, tmp_path, monkeypatch):
 
     assert Path(path).read_bytes() == original  # 原文件未被破坏
     assert not os.path.exists(path + '.tmp')    # 无半成品残留
+
+
+def test_load_default_css_missing_file_gives_friendly_error(tmp_path,
+                                                             monkeypatch):
+    """样式文件缺失时抛带恢复指引的 RuntimeError，而非裸 FileNotFoundError。
+
+    pythonw 启动下 import 期异常没有任何控制台输出，必须给出可读的指引；
+    monkeypatch 结束后 STYLES_DIR 自动恢复，不影响其它用例。
+    """
+    import services
+
+    monkeypatch.setattr(services, 'STYLES_DIR', str(tmp_path / 'no_such_dir'))
+    with pytest.raises(RuntimeError, match='缺少样式文件'):
+        services._load_default_css()
