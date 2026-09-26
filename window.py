@@ -190,6 +190,7 @@ class MainWindow(QMainWindow):
         self._ordered_chapters: list[tuple[int, str]] | None = None  # ChapterDialog 调整后的章节 [(原始索引, 新标题)]
         self._ordered_chapters_src: tuple[str, str, str] | None = None  # _ordered_chapters 的来源指纹 (txt路径, 正则, 编码)
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
+        self._detected_encoding = 'utf-8'          # chardet 检测到的输入编码
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
@@ -881,11 +882,22 @@ class MainWindow(QMainWindow):
             data = f.read(_ENCODE_DETECT_SIZE)
             info = chardet.detect(data) or {}
             enc = info.get('encoding') or 'utf-8'
+            self._detected_encoding = enc
             lang = info.get('language', '未知')
             self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
             logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
 
         logger.info(f'选择 TXT: {path}')
+
+    def _current_txt_encoding(self) -> str:
+        """返回 tab1 当前生效的输入编码。
+
+        "自动检测"（index=0）时返回 chardet 结果，
+        否则返回用户手动选择的编码。检测失败回退 utf-8。
+        """
+        if self._cb_encode.currentIndex() == 0:
+            return self._detected_encoding or 'utf-8'
+        return self._cb_encode.currentText()
 
     def _on_browse_epub(self):
         """浏览——选择 EPUB 保存路径（必须是 .epub 扩展名）。"""
@@ -923,9 +935,8 @@ class MainWindow(QMainWindow):
         reg = self._te_reg.text().strip()
         if len(reg) < _MIN_REGEX_LEN:
             reg = DEFAULT_CHAPTER_REGEX
-        # 索引 0 是"自动检测"，转换器保持默认编码 utf-8
-        enc = (self._cb_encode.currentText()
-               if self._cb_encode.currentIndex() != 0 else 'utf-8')
+        # 生效编码：自动检测时用 chardet 结果，手动时用所选编码
+        enc = self._current_txt_encoding()
         return (txt, reg, enc)
 
     def _on_preview_chapters(self):
@@ -948,8 +959,7 @@ class MainWindow(QMainWindow):
 
         try:
             conv = Txt2Epub(txt, self._le_epub.text() or txt + '.epub')
-            if self._cb_encode.currentIndex() != 0:
-                conv.encoding = self._cb_encode.currentText()
+            conv.encoding = self._current_txt_encoding()
             reg = self._te_reg.text().strip()
             if len(reg) >= _MIN_REGEX_LEN:
                 conv.regex = reg
@@ -982,6 +992,7 @@ class MainWindow(QMainWindow):
         self._txt_cover = ''
         self._reset_cover(self._cover_label)
         self._cb_encode.setCurrentIndex(0)
+        self._detected_encoding = 'utf-8'
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self._ordered_chapters_src = None
@@ -1034,8 +1045,7 @@ class MainWindow(QMainWindow):
             conv.description = self._le_txt_desc.text().strip()
         if self._txt_cover:
             conv.cover_path = self._txt_cover
-        if self._cb_encode.currentIndex() != 0:
-            conv.encoding = self._cb_encode.currentText()
+        conv.encoding = self._current_txt_encoding()
         if len(reg) >= _MIN_REGEX_LEN:
             conv.regex = reg
         # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
