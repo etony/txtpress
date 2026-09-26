@@ -39,7 +39,8 @@ from opencc import OpenCC
 
 from models import BookInfo
 from constants import (
-    DEFAULT_COVER, DEFAULT_AUTHOR, DEFAULT_DESC, DEFAULT_ID
+    DEFAULT_COVER, DEFAULT_AUTHOR, DEFAULT_DESC, DEFAULT_ID,
+    DEFAULT_CHAPTER_REGEX, STYLES_DIR,
 )
 
 
@@ -56,50 +57,17 @@ _MAX_FILENAME_LEN = 50
 # 进度状态栏中显示的章节标题最大长度（截断显示，保持状态栏简洁）
 _STATUS_TITLE_LEN = 20
 
-# 匹配中文章节标题的正则表达式
-# 匹配"第一章"、"第十二章"、"第二百三十章"、"卷三"、"上回"等
-# 正则拆解：
-#   ^\s*          行首 + 任意空白
-#   [第卷]         以"第"或"卷"开头
-#   [0123456789一二三四五六七八九十零〇百千两]*  零个或多个数字/中文数字
-#   [章回部节集卷]  结尾的章节单位词
-#   .*            标题剩余内容
-#   \s*           结尾空白
-DEFAULT_CHAPTER_REGEX = (
-    r'^\s*([第卷][0123456789一二三四五六七八九十零〇百千两]*[章回部节集卷].*)\s*'
-)
+# 章节默认正则见 constants.DEFAULT_CHAPTER_REGEX（此处 re-export 供旧调用方使用）
 
-# EPUB 内嵌的 CSS 样式
+def _load_default_css() -> str:
+    """读取内置默认 EPUB 样式（styles/default.css）。"""
+    with open(os.path.join(STYLES_DIR, 'default.css'), encoding='utf-8') as f:
+        return f.read()
+
+
+# EPUB 内嵌的默认 CSS 样式
 # 控制正文、标题、目录页的显示效果，阅读器（如 Kindle）会按此渲染
-# 注意：
-#   - @namespace 是 EPUB 3 必需的，声明 epub 前缀用于目录页选择器
-#   - widows/orphans 控制段落分页时保留最少行数（提升阅读体验）
-#   - nav[epub|type~='toc'] 选择器匹配 EPUB 3 的目录页
-CSS_STYLE = '''
-@namespace epub "http://www.idpf.org/2007/ops";
-body {
-    font-family: Cambria, "Liberation Serif", Georgia, "Times New Roman", serif;
-}
-h1 {
-    text-align: left; text-indent: 2em;
-    font-family: "Microsoft YaHei", sans-serif;
-    font-weight: bold; color: #D2691E; line-height: 300%;
-    margin: 30px 0 0 0;
-}
-h2 {
-    text-align: left; text-indent: 2em;
-    font-family: "Microsoft YaHei", sans-serif;
-    font-weight: bold; color: #D2691E; line-height: 240%;
-    margin: 20px 0 0 0;
-}
-p {
-    text-indent: 1.25em; margin: 0; widows: 2; orphans: 2;
-}
-ol { list-style-type: none; }
-ol > li:first-child { margin-top: 0.3em; }
-nav[epub|type~='toc'] > ol > li > ol { list-style-type: square; }
-nav[epub|type~='toc'] > ol > li > ol > li { margin-top: 0.3em; }
-'''
+CSS_STYLE = _load_default_css()
 
 
 def _text_to_html(text: str) -> str:
@@ -1082,7 +1050,6 @@ def extract_mobi_cover(mobi_path: Path, cover_offset: int) -> Optional[bytes]:
             return None
         finally:
             # 清理临时目录
-            import shutil
             shutil.rmtree(tmpdir, ignore_errors=True)
             
     except Exception as e:

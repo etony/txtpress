@@ -165,7 +165,6 @@ txtpress/
 - 浅色主题从 `resources/theme.qss` 加载
 - 深色主题内嵌在 `theme_manager.py` 中
 - `toggle_theme()` 切换主题
-- `get_theme_icon()` 返回当前主题对应的图标
 
 ### resources/theme.qss — 浅色主题样式表
 

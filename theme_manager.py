@@ -84,7 +84,6 @@ class ThemeManager:
     def __init__(self):
         self._current_theme = Theme.LIGHT
         self._app: Optional[QApplication] = None
-        self._styles_dir = os.path.join(BASE_DIR, 'styles')
     
     def set_app(self, app: QApplication):
         """设置QApplication实例"""
@@ -121,12 +120,6 @@ class ThemeManager:
         else:
             self.set_theme(Theme.LIGHT)
     
-    def get_theme_icon(self) -> str:
-        """获取当前主题对应的图标"""
-        if self._current_theme == Theme.DARK:
-            return '☀️'
-        return '🌙'
-
 
 # 全局主题管理器实例
 theme_manager = ThemeManager()

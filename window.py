@@ -1877,7 +1877,6 @@ class MainWindow(QMainWindow):
                 pass  # 几何数据无效时使用默认值
         # 主题
         if hasattr(cfg, 'theme') and cfg.theme:
-            from theme_manager import Theme
             theme = Theme.DARK if cfg.theme == 'dark' else Theme.LIGHT
             self._theme_manager.set_theme(theme)
             self._theme_btn.setIcon(self._create_theme_icon(cfg.theme))
