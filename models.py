@@ -97,10 +97,12 @@ class AppConfig:
             return cls()
         # fields(cls) 返回 dataclass 定义的所有字段名，
         # 只保留这些字段，多余的扔掉（安全的配置加载策略）。
+        # txt_encoding 不做类型转换：旧版本存的序号（int）原样保留，
+        # 由 window 层 _restore_config 转换成当前下拉的显示文本。
+        # 双格式共存期兼容：老版本序号配置不再产生后，
+        # 本注释与 window 层序号映射分支可一并删除
         valid_keys = {f.name for f in fields(cls)}
         filtered = {k: v for k, v in data.items() if k in valid_keys}
-        # 兼容旧版本存的序号（int）：不做类型转换，
-        # 由 window 层 _restore_config 转换成当前下拉的显示文本
         # hex 字符串还原为 bytes
         if isinstance(filtered.get('window_geometry'), str):
             try:

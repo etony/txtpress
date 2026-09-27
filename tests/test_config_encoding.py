@@ -140,6 +140,21 @@ def test_window_restore_legacy_int_out_of_range(make_window):
     assert win._cb_encode.currentText() == '自动检测'
 
 
+def test_window_upgrade_legacy_index_on_first_save(make_window):
+    """旧序号 config 恢复后首次保存即完成格式升级（2 → 'gbk'）。
+
+    走真实 tmp CONFIG_PATH 隔离：读旧格式 → _restore_config 映射 →
+    _save_config 落盘，钉死 JSON 里是 str 语义值而非 int 序号。
+    """
+    win = make_window({'txt_encoding': 2})
+    assert win._cb_encode.currentText() == 'gbk'
+    win._save_config()
+    data = json.loads(
+        Path(wmod.CONFIG_PATH).read_text(encoding='utf-8'))
+    assert data['txt_encoding'] == 'gbk'
+    assert isinstance(data['txt_encoding'], str)
+
+
 # ================================================================
 # 子项 3：非法/未知值回退
 # ================================================================
@@ -149,6 +164,7 @@ def test_window_restore_legacy_int_out_of_range(make_window):
     '不存在的编码',   # 未知语义值
     None,            # JSON null
     2.0,             # 浮点脏数据
+    True,            # bool 脏数据（bool 是 int 子类，须走回退而非序号 1）
     ['gbk'],         # 类型脏数据
     '',              # 空串
 ])

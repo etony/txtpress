@@ -1932,11 +1932,16 @@ class MainWindow(QMainWindow):
 
         findText 匹配下拉框中的文本，匹配不上就保持默认。
         这样即使 config.json 被手动编辑成了非法值，也不会崩溃。
+        txt_encoding 兼容旧版本存的 ComboBox 序号（int/数字串），
+        按当前下拉项映射成显示文本后再恢复。
         """
         cfg = self._config
         # 编码（新格式存语义值/显示文本，旧格式存 ComboBox 序号）
+        # 双格式共存期兼容：老版本序号配置不再产生后，本分支可连同
+        # findText 回退一起简化
         raw = cfg.txt_encoding
-        if isinstance(raw, int) or (isinstance(raw, str) and raw.isdigit()):
+        if (isinstance(raw, int) and not isinstance(raw, bool)) or (
+                isinstance(raw, str) and raw.isdigit()):
             # 旧版本存的是 ComboBox 序号，转换成显示文本
             idx = int(raw)
             text = (self._cb_encode.itemText(idx)
@@ -1946,10 +1951,10 @@ class MainWindow(QMainWindow):
         else:
             text = '自动检测'
         # 非法值 findText 返回 -1，回退到默认第 0 项（自动检测）
-        self._cb_encode.setCurrentIndex(max(self._cb_encode.findText(text), 0))
-        idx = self._cb_out_code.findText(cfg.out_encoding)
-        if idx >= 0:
-            self._cb_out_code.setCurrentIndex(idx)
+        enc_idx = self._cb_encode.findText(text)
+        self._cb_encode.setCurrentIndex(enc_idx if enc_idx >= 0 else 0)
+        out_idx = self._cb_out_code.findText(cfg.out_encoding)
+        self._cb_out_code.setCurrentIndex(out_idx if out_idx >= 0 else 0)
         # 分隔符
         idx = self._cb_sep.findText(cfg.chapter_sep)
         if idx >= 0:
