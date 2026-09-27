@@ -14,7 +14,7 @@
 | MOBI 元信息提取 | 自动提取 MOBI 文件的标题、作者、出版商、ISBN、语言、出版日期 |
 | 章节排序 | 目录预览对话框中拖拽调整章节顺序 |
 | 繁→简转换 | 导出 TXT 时自动转换繁体中文 |
-| 拖放支持 | 从文件管理器拖入 .txt / .epub 文件自动加载 |
+| 拖放支持 | 从文件管理器拖入 .txt / .epub / .mobi 自动切换对应页面并加载 |
 | 快捷键 | Ctrl+Enter 转换、Ctrl+O 打开、Ctrl+R 重置、F1 关于 |
 | 主题切换 | 深色/浅色主题切换，状态栏太阳/月亮图标 |
 | 章节正则预设 | 4 种常用正则预设 + 自定义输入 |
@@ -45,21 +45,38 @@ python main.py      # 标准启动（带控制台）
 python main.pyw     # Windows 无控制台启动
 ```
 
+## 开发
+
+```bash
+pip install -r requirements-dev.txt   # 开发依赖（pytest、ruff）
+python -m pytest tests/ -v            # 单元测试
+python -m ruff check .                # 静态检查
+```
+
 ## 项目结构
 
 ```
 txtpress/
 ├── main.py                      # 程序入口
 ├── main.pyw                     # Windows 无控制台启动
-├── window.py                    # 主窗口 UI（~1750 行）
+├── window.py                    # 主窗口宿主（Tab 挂载、worker、快捷键、拖放、主题、配置）
+├── tab_base.py                  # Tab 基类 BaseTab（回调注入）+ 共享控件
+├── tab_txt2epub.py              # TXT → EPUB 页面
+├── tab_epub2txt.py              # EPUB → TXT 页面
+├── tab_mobi2txt.py              # MOBI → TXT 页面
 ├── services.py                  # 核心转换逻辑
 ├── models.py                    # 数据模型
 ├── worker.py                    # 后台线程
+├── utils.py                     # 通用工具（跨平台打开目录）
 ├── dialogs.py                   # 自定义对话框
 ├── constants.py                 # 全局常量（路径、正则预设等）
 ├── error_handler.py             # 用户友好错误提示映射
 ├── theme_manager.py             # 深色/浅色主题切换管理
+├── conftest.py                  # pytest 全局配置与共享 fixture
+├── tests/                       # 单元测试（11 个测试文件）
+├── ruff.toml                    # ruff 静态检查配置
 ├── requirements.txt             # Python 依赖
+├── requirements-dev.txt         # 开发依赖（pytest、ruff）
 ├── README.md                    # 本文件
 ├── config.json                  # 用户偏好配置（自动生成）
 ├── resources/
@@ -80,23 +97,40 @@ txtpress/
 
 创建 QApplication，加载 QSS 样式表，设置高 DPI 适配和默认字体（微软雅黑），实例化并显示 MainWindow。设置应用程序图标用于任务栏显示。
 
-### window.py — 主窗口 UI
+### window.py — 主窗口宿主
 
-整个程序的"骨架"。包含三个 Tab 的布局构建、所有控件创建和事件绑定。关键方法：
+主窗口骨架与跨切面逻辑。三个 Tab 的页面构建已迁至 `tab_*.py`，本文件负责：
 
-- `_setup_tab1()` — TXT → EPUB 页面（源文件 → 书籍信息 → 高级选项 → 操作）
-- `_setup_tab2()` — EPUB → TXT 页面（合并/按章节导出/提取图片/编辑元信息）
-- `_setup_tab3()` — MOBI → TXT 页面
-- `_create_book_info_group()` — 统一书籍信息组布局（封面 + 字段 + 按钮）
-- `_on_choose_cover_impl()` — 封面选择通用实现
-- `_reset_cover()` / `_reset_status()` — 重置辅助方法
-- `_run_worker()` — 启动后台线程，连接进度/状态/完成信号到 UI
-- 快捷键、窗口级和行级拖放支持
+- 创建 `QTabWidget` 并挂载三个 Tab，向每个 Tab 注入回调（`run_worker` / `is_busy` / `save_config` / `show_status` / `confirm_output_path`），Tab 不反向 import window
+- `_run_worker()` — 启动后台线程，连接进度/状态/完成信号，管理取消按钮与 Tab 禁用
+- `_confirm_output_path()` / `_ask_open_dir()` / `_open_dir()` — 输出路径确认与打开目录
+- 快捷键与窗口级拖放（.txt / .epub / .mobi 自动切换到对应页面；行级拖放见 `tab_base._DropLineEdit`）
 - `_save_config()` / `_restore_config()` — 配置持久化
-- `_toggle_theme()` — 主题切换
+- `_toggle_theme()` — 主题切换（委托 `ThemeManager`）
 - `_create_theme_icon()` — 绘制太阳/月亮图标
-- `_on_regex_preset_changed()` — 正则预设变更处理
-- `_load_epub_styles()` — 加载 EPUB 样式列表
+- `_on_about()` — 关于弹窗
+
+### tab_base.py — Tab 基类与共享控件
+
+| 类 | 用途 |
+|---|---|
+| `BaseTab` | 三个页面的公共父类：构造时接收 MainWindow 能力回调；提供 `_create_book_info_group()`、`_on_choose_cover_impl()`、`_reset_cover()` / `_reset_status()`、`_create_file_row()` 等公共 UI |
+| `_ClickableLabel` | 可点击的图片标签（封面预览，鼠标/回车触发 `clicked`） |
+| `_DropLineEdit` | 支持拖放文件的输入框，按扩展名过滤 |
+
+### tab_txt2epub.py / tab_epub2txt.py / tab_mobi2txt.py — 页面模块
+
+| 类 | 用途 |
+|---|---|
+| `TabTxt2Epub` | TXT → EPUB 页面：编码自动检测、正则预设、章节目录预览、EPUB 样式选择 |
+| `TabEpub2Txt` | EPUB → TXT 页面：合并/按章节导出、提取图片、编辑元信息、繁简开关 |
+| `TabMobi2Txt` | MOBI → TXT 页面：元信息提取与文本导出 |
+
+每个类继承 `BaseTab`，实现统一的 `convert()` / `open_file()` / `reset()` / `load_file()`（拖放）接口。
+
+### utils.py — 通用工具
+
+`open_dir()`：跨平台打开目录（Windows `os.startfile` / macOS `open` / Linux `xdg-open`）。
 
 ### services.py — 核心转换逻辑
 
@@ -113,7 +147,7 @@ txtpress/
 
 所有转换方法接受可选 `progress(current, total)` 和 `status(message)` 回调，通过 `worker.py` 实现实时进度报告。
 
-`Txt2Epub` 支持 `load_css_from_file()` 方法加载自定义 EPUB 样式。
+`Txt2Epub` 支持 `load_css_from_file()` 方法加载自定义 EPUB 样式，`configure(opts)` 按 `ConvertOptions` 批量设置转换参数。
 
 ### models.py — 数据模型
 
@@ -122,6 +156,7 @@ txtpress/
 | 类 | 用途 |
 |---|---|
 | `BookInfo` | EPUB 书籍元数据（title / creator / contributor / date / description / cover） |
+| `ConvertOptions` | TXT → EPUB 转换参数集合，由 `Txt2Epub.configure()` 批量应用 |
 | `AppConfig` | 用户偏好配置，通过 config.json 序列化（编码、分隔符、正则、繁简开关、主题、正则预设、EPUB 样式） |
 
 `AppConfig.load()` 自动忽略 JSON 中的多余字段，`save()` 以中文友好的格式写入。`window_geometry` 使用 hex 字符串序列化 bytes 类型。
@@ -130,10 +165,10 @@ txtpress/
 
 `ProgressWorker(QThread)` 是连接 UI 和业务层的桥梁：
 
-- 三个信号：`progress(int, int)` / `status(str)` / `finished(bool, str)`
+- 三个信号：`progress(int, int)` / `status(str)` / `task_done(bool, str, bool)`（成功, 错误信息, 是否取消）
 - 自动注入 `progress` / `status` 回调到业务函数
-- 支持取消操作（通过 `cancel()` 设置标志位）
-- 异常自动捕获并通过 `finished` 信号传回主线程
+- 支持取消操作（`cancel()` 设置线程安全标志，业务线程在下一次进度上报时感知）
+- 异常自动捕获并通过 `task_done` 信号传回主线程
 
 ### dialogs.py — 自定义对话框
 
@@ -156,7 +191,7 @@ txtpress/
 
 ### error_handler.py — 错误处理
 
-用户友好的错误提示映射，提供 `show_error()`、`show_warning()`、`show_info()` 函数。
+用户友好的错误提示映射，提供 `show_error()`、`show_warning()`、`show_info()` 函数。任务失败弹窗和章节目录预览异常统一经 `show_error()` 按错误码显示文案。
 
 ### theme_manager.py — 主题管理
 
@@ -181,6 +216,7 @@ Material Design Light 风格，覆盖全局颜色、字体、间距、按钮状�
 ## 设计要点
 
 - **MVC 风格**：window.py（视图） ↔ worker.py（控制器） ↔ services.py（模型）
+- **Tab 解耦**：三个页面为 `BaseTab` 子类，通过构造回调注入 MainWindow 能力，不反向 import window
 - **业务层无 UI 依赖**：services.py 不 import PyQt，方便测试和命令行复用
 - **Lazy 初始化**：OpenCC（繁简转换）只在首次使用时创建，避免不必要的资源消耗
 - **三重封面策略**：通过 ID / 类型 / 文件名三种方式查找 EPUB 封面，兼容不同制作工具
