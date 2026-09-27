@@ -106,33 +106,33 @@ def test_reset_tab2_restores_all_fields(main_window, tmp_path):
     """tab2 重置：全部输入/输出选项/目录缓存回到默认（断言表）。"""
     win = main_window
     # 先勾选繁简（源文件路径尚空，联动槽提前返回，不依赖 OpenCC）
-    win._chb_fanjian.setChecked(True)
-    win._le_in_epub.setText(str(tmp_path / 'in.epub'))
-    win._le_out_txt.setText(str(tmp_path / 'out.txt'))
-    win._le_book_title.setText('t')
-    win._le_book_creator.setText('c')
-    win._le_book_contrib.setText('cb')
-    win._le_book_date.setText('2021-02-02')
-    win._le_book_desc.setText('d')
-    win._epub_cover_path = '/tmp/c.jpg'
-    win._cb_out_code.setCurrentIndex(2)
-    win._cb_sep.setCurrentIndex(3)
-    win._epub_dir = str(tmp_path)
+    win._tab_epub2txt._chb_fanjian.setChecked(True)
+    win._tab_epub2txt._le_in_epub.setText(str(tmp_path / 'in.epub'))
+    win._tab_epub2txt._le_out_txt.setText(str(tmp_path / 'out.txt'))
+    win._tab_epub2txt._le_book_title.setText('t')
+    win._tab_epub2txt._le_book_creator.setText('c')
+    win._tab_epub2txt._le_book_contrib.setText('cb')
+    win._tab_epub2txt._le_book_date.setText('2021-02-02')
+    win._tab_epub2txt._le_book_desc.setText('d')
+    win._tab_epub2txt._epub_cover_path = '/tmp/c.jpg'
+    win._tab_epub2txt._cb_out_code.setCurrentIndex(2)
+    win._tab_epub2txt._cb_sep.setCurrentIndex(3)
+    win._tab_epub2txt._epub_dir = str(tmp_path)
 
-    win._on_reset_tab2()
+    win._tab_epub2txt._on_reset_tab2()
 
     # ---- 断言表 ----
-    for widget in (win._le_in_epub, win._le_out_txt, win._le_book_title,
-                   win._le_book_creator, win._le_book_contrib,
-                   win._le_book_date, win._le_book_desc):
+    for widget in (win._tab_epub2txt._le_in_epub, win._tab_epub2txt._le_out_txt, win._tab_epub2txt._le_book_title,
+                   win._tab_epub2txt._le_book_creator, win._tab_epub2txt._le_book_contrib,
+                   win._tab_epub2txt._le_book_date, win._tab_epub2txt._le_book_desc):
         assert widget.text() == ''
-    assert win._epub_cover_path == ''
-    assert win._cover_label2.pixmap() is not None
-    assert not win._cover_label2.pixmap().isNull()
-    assert win._cb_out_code.currentIndex() == 0
-    assert win._cb_sep.currentIndex() == 0
-    assert win._chb_fanjian.isChecked() is False
-    assert win._epub_dir == ''
+    assert win._tab_epub2txt._epub_cover_path == ''
+    assert win._tab_epub2txt._cover_label2.pixmap() is not None
+    assert not win._tab_epub2txt._cover_label2.pixmap().isNull()
+    assert win._tab_epub2txt._cb_out_code.currentIndex() == 0
+    assert win._tab_epub2txt._cb_sep.currentIndex() == 0
+    assert win._tab_epub2txt._chb_fanjian.isChecked() is False
+    assert win._tab_epub2txt._epub_dir == ''
     assert win.statusBar().currentMessage() == '已重置'
 
 
@@ -250,12 +250,12 @@ def test_tab2_rejects_output_equal_to_input(main_window, make_epub):
     """tab2：TXT 输出路径指向输入 EPUB 本身 → 拒绝。"""
     win = main_window
     path = make_epub()
-    win._le_in_epub.setText(path)
-    win._le_out_txt.setText(path)
+    win._tab_epub2txt._le_in_epub.setText(path)
+    win._tab_epub2txt._le_out_txt.setText(path)
 
     with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab2()
+        win._tab_epub2txt._on_convert_tab2()
 
     warn.assert_called_once()
     assert '输出路径不能与输入文件相同' in warn.call_args.args[2]
@@ -266,13 +266,13 @@ def test_tab2_allows_clean_output_path(main_window, make_epub, tmp_path):
     """tab2：合法输出路径 → 放行。"""
     win = main_window
     path = make_epub()
-    win._le_in_epub.setText(path)
-    win._le_out_txt.setText(str(tmp_path / 'out.txt'))
+    win._tab_epub2txt._le_in_epub.setText(path)
+    win._tab_epub2txt._le_out_txt.setText(str(tmp_path / 'out.txt'))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
             mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_chapter()
+        win._tab_epub2txt._on_convert_chapter()
 
     question.assert_not_called()
     warn.assert_not_called()
@@ -514,15 +514,15 @@ def test_chapter_export_confirmation_targets_chapter1(main_window, make_epub,
     out.write_text('merged', encoding='utf-8')
     ch1 = tmp_path / 'out1.txt'
     ch1.write_text('ch1', encoding='utf-8')
-    win._le_in_epub.setText(path)
-    win._le_out_txt.setText(str(out))
+    win._tab_epub2txt._le_in_epub.setText(path)
+    win._tab_epub2txt._le_out_txt.setText(str(out))
 
     with mock.patch.object(wmod.QMessageBox, 'question',
                            return_value=wmod.QMessageBox.StandardButton.No
                            ) as question, \
             mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_chapter()
+        win._tab_epub2txt._on_convert_chapter()
 
     question.assert_called_once()
     text = question.call_args.args[2]
@@ -539,13 +539,13 @@ def test_chapter_export_runs_when_only_out_txt_exists(main_window, make_epub,
     path = make_epub()
     out = tmp_path / 'out.txt'
     out.write_text('merged', encoding='utf-8')
-    win._le_in_epub.setText(path)
-    win._le_out_txt.setText(str(out))
+    win._tab_epub2txt._le_in_epub.setText(path)
+    win._tab_epub2txt._le_out_txt.setText(str(out))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
             mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_chapter()
+        win._tab_epub2txt._on_convert_chapter()
 
     question.assert_not_called()
     warn.assert_not_called()

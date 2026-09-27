@@ -321,7 +321,7 @@ def test_load_epub_file_fills_fields_via_worker(main_window, qapp,
     path = make_epub()
 
     with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        main_window._load_epub_file(path)
+        main_window._tab_epub2txt._load_epub_file(path)
         # 轮询事件循环直到 _done 清空 worker 引用（真实后台线程）
         deadline = time.time() + 15
         while main_window._worker is not None and time.time() < deadline:
@@ -330,9 +330,9 @@ def test_load_epub_file_fills_fields_via_worker(main_window, qapp,
 
     crit.assert_not_called()
     assert main_window._worker is None
-    assert main_window._le_in_epub.text() == path
-    assert main_window._le_out_txt.text().endswith('.txt')
-    assert main_window._le_book_title.text() == '测试书'
+    assert main_window._tab_epub2txt._le_in_epub.text() == path
+    assert main_window._tab_epub2txt._le_out_txt.text().endswith('.txt')
+    assert main_window._tab_epub2txt._le_book_title.text() == '测试书'
     assert main_window.statusBar().currentMessage().startswith('已加载')
     assert main_window._tabs.isEnabled() is True
     assert main_window._progress_bar.isHidden() is True
@@ -376,7 +376,7 @@ def test_done_survives_on_success_exception(main_window, monkeypatch):
 def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
     """端到端：_on_extract_images 真 worker 提取图片，on_success 在主线程弹窗。"""
     path = make_epub(images=['pic.png'])
-    main_window._le_in_epub.setText(path)
+    main_window._tab_epub2txt._le_in_epub.setText(path)
     out_dir = os.path.join(os.path.dirname(path), 'images')
     seen = {}
 
@@ -389,7 +389,7 @@ def test_extract_images_end_to_end_success(main_window, qapp, make_epub):
     with mock.patch.object(wmod.QMessageBox, 'question', side_effect=_question), \
             mock.patch.object(wmod.QMessageBox, 'information') as info, \
             mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        main_window._on_extract_images()
+        main_window._tab_epub2txt._on_extract_images()
         _wait_worker(main_window, qapp)
 
     crit.assert_not_called()
@@ -409,10 +409,10 @@ def test_extract_images_end_to_end_failure(main_window, qapp, tmp_path):
     """端到端失败路径：坏 EPUB 走 epub_read_failed 友好弹窗与 fail_msg 状态栏。"""
     bad = tmp_path / 'bad.epub'
     bad.write_bytes(b'not an epub at all')
-    main_window._le_in_epub.setText(str(bad))
+    main_window._tab_epub2txt._le_in_epub.setText(str(bad))
 
     with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        main_window._on_extract_images()
+        main_window._tab_epub2txt._on_extract_images()
         _wait_worker(main_window, qapp)
 
     crit.assert_called_once()
@@ -497,18 +497,18 @@ def test_run_worker_call_sites_error_codes(main_window, monkeypatch,
     # 1. _load_epub_file → epub_read_failed
     crit = _run_to_failure(
         main_window,
-        lambda: main_window._load_epub_file(str(tmp_path / 'x.epub')))
+        lambda: main_window._tab_epub2txt._load_epub_file(str(tmp_path / 'x.epub')))
     assert '无法读取EPUB文件' in crit.call_args.args[2]
 
     # 2. _on_save_metadata → epub_write_failed（校验要求 EPUB 存在）
     epub = tmp_path / 'x.epub'
     epub.write_bytes(b'x')
-    main_window._le_in_epub.setText(str(epub))
-    crit = _run_to_failure(main_window, main_window._on_save_metadata)
+    main_window._tab_epub2txt._le_in_epub.setText(str(epub))
+    crit = _run_to_failure(main_window, main_window._tab_epub2txt._on_save_metadata)
     assert '保存EPUB文件失败' in crit.call_args.args[2]
 
     # 3. _on_extract_images → epub_read_failed
-    crit = _run_to_failure(main_window, main_window._on_extract_images)
+    crit = _run_to_failure(main_window, main_window._tab_epub2txt._on_extract_images)
     assert '无法读取EPUB文件' in crit.call_args.args[2]
 
     # 4. _load_mobi_metadata → mobi_read_failed
