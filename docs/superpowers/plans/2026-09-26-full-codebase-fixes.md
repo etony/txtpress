@@ -2675,6 +2675,9 @@ git log --oneline               # 每任务一条英文提交
   #1-#5/#9/#10 需人工启动 `python main.py` 确认。
 - **执行中累积的遗留**（计划原表 3 项之外）：
   1. `services.py` `language='cn'` 非法 BCP47（应为 `zh`/`zh-CN`）——Task 20 评审记录；
+     Task 20 评审补充（最终整体评审复核）：`models.py` `ConvertOptions.language`
+     默认也是 `'cn'`，且经 `configure()` 总是生效（非空默认值不被 falsy skip 跳过），
+     修复须两处同改；
   2. `window.py` `on_success` 保护分支弹窗未走 `show_error`（与失败分支风格不一致）——Task 14 评审记录；
   3. error_handler 未知错误码兜底只显示"未知错误"，`fail_msg` 仅在状态栏——Task 14 评审记录；
   4. `_parse_key` 章节指纹不含文件 mtime，同路径原地覆盖文件不触发目录失效——Task 5/9 评审记录；

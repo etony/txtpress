@@ -218,6 +218,7 @@ class TabEpub2Txt(BaseTab):
             path: EPUB 文件路径
         """
         if self.is_busy():
+            self.show_status('已有转换任务进行中，忽略拖放')
             return
         self._le_in_epub.setText(path)
         self._epub_dir, fname = os.path.split(path)

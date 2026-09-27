@@ -14,6 +14,8 @@ Task 12：on_success 回调时机、fail_msg 文案、show_progress 显隐，
 
 Task 14：error_handler 友好错误提示——_run_worker 的 error_code 映射、
 调用点错误码分配、_on_preview_chapters 的 regex_invalid 接入。
+
+最终整体评审：busy 时三 Tab 拖放加载防护 + 转换前正则 regex_invalid 接入。
 """
 import os
 import threading
@@ -550,3 +552,81 @@ def test_preview_generic_error_uses_conversion_failed(main_window, tmp_path,
     msg = crit.call_args.args[2]
     assert '转换过程中发生错误' in msg
     assert 'boom' in msg
+
+
+# ================================================================
+# 最终整体评审：busy 时三 Tab 拖放加载防护 + 转换前正则 regex_invalid
+# ================================================================
+
+
+def _set_busy(main_window):
+    """置一个假 worker 让 MainWindow._is_busy() 为 True。"""
+    fake = _FakeWorker(None)
+    fake.running = True
+    main_window._worker = fake
+    return fake
+
+
+def test_load_txt_file_blocked_when_busy(main_window):
+    """busy 时 Tab1 拖放加载被挡：字段不被改写、状态栏有提示。"""
+    _set_busy(main_window)
+    tab = main_window._tab_txt2epub
+    tab._le_txt.setText('/old/a.txt')
+    tab._le_title.setText('旧书名')
+
+    tab._load_txt_file('/new/b.txt')
+
+    assert tab._le_txt.text() == '/old/a.txt'
+    assert tab._le_title.text() == '旧书名'
+    assert main_window.statusBar().currentMessage() == \
+        '已有转换任务进行中，忽略拖放'
+
+
+def test_load_mobi_file_blocked_when_busy(main_window):
+    """busy 时 Tab3 拖放加载被挡：路径不改写、元数据刷新未被调（打桩）。"""
+    _set_busy(main_window)
+    tab = main_window._tab_mobi2txt
+    tab._le_mobi.setText('/old/a.mobi')
+    tab._le_mobi_txt.setText('/old/a.txt')
+
+    with mock.patch.object(tab, '_load_mobi_metadata') as load_md:
+        tab._load_mobi_file('/new/b.mobi')
+
+    load_md.assert_not_called()
+    assert tab._le_mobi.text() == '/old/a.mobi'
+    assert tab._le_mobi_txt.text() == '/old/a.txt'
+    assert main_window.statusBar().currentMessage() == \
+        '已有转换任务进行中，忽略拖放'
+
+
+def test_load_epub_file_blocked_when_busy(main_window):
+    """busy 时 Tab2 拖放加载被挡并提示（文案与 Tab1/Tab3 一致）。"""
+    _set_busy(main_window)
+    tab = main_window._tab_epub2txt
+    tab._le_in_epub.setText('/old/a.epub')
+
+    tab._load_epub_file('/new/b.epub')
+
+    assert tab._le_in_epub.text() == '/old/a.epub'
+    assert main_window.statusBar().currentMessage() == \
+        '已有转换任务进行中，忽略拖放'
+
+
+def test_convert_invalid_regex_uses_regex_invalid(main_window, sample_txt,
+                                                  tmp_path):
+    """转换前正则 ValueError → regex_invalid 友好弹窗（与预览一致），不启动转换。"""
+    win = main_window
+    win._tab_txt2epub._le_txt.setText(sample_txt)
+    win._tab_txt2epub._le_epub.setText(str(tmp_path / 'out.epub'))
+    win._tab_txt2epub._te_reg.setText('(?:第.+章)')  # 0 捕获组 → ValueError
+
+    with mock.patch.object(wmod.QMessageBox, 'critical') as crit, \
+            mock.patch.object(win, '_run_worker') as run:
+        win._tab_txt2epub._on_convert_tab1()
+
+    crit.assert_called_once()
+    assert crit.call_args.args[1] == '错误'
+    msg = crit.call_args.args[2]
+    assert '正则表达式格式错误，请检查语法' in msg  # regex_invalid 映射
+    assert '捕获组' in msg
+    run.assert_not_called()

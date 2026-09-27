@@ -279,6 +279,9 @@ class TabTxt2Epub(BaseTab):
         用 chardet 库读取文件前 4096 字节判断编码。
         检测结果仅供参考，用户可以在"高级选项"中手动选择合适的编码。
         """
+        if self.is_busy():
+            self.show_status('已有转换任务进行中，忽略拖放')
+            return
         self._le_txt.setText(path)
         self._txt_dir, fname = os.path.split(path)
         base, _ = os.path.splitext(fname)
@@ -451,7 +454,7 @@ class TabTxt2Epub(BaseTab):
         try:
             validate_chapter_regex(effective_regex)
         except ValueError as e:
-            QMessageBox.warning(self.window(), '提示', str(e))
+            show_error(self.window(), '错误', 'regex_invalid', str(e))
             return
 
         self.save_config()

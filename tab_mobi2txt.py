@@ -179,6 +179,9 @@ class TabMobi2Txt(BaseTab):
         与 _on_browse_mobi 的逻辑相同，但不弹出文件对话框。
         用于窗口拖放加载 .mobi 文件。
         """
+        if self.is_busy():
+            self.show_status('已有转换任务进行中，忽略拖放')
+            return
         self._le_mobi.setText(path)
         d, fname = os.path.split(path)
         base, _ = os.path.splitext(fname)
