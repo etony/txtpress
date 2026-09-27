@@ -211,9 +211,9 @@ def test_shortcuts_blocked_when_busy(main_window):
     fake.running = True
     main_window._worker = fake
 
-    with mock.patch.object(main_window, '_on_convert_tab1') as conv, \
-            mock.patch.object(main_window, '_on_browse_txt') as browse, \
-            mock.patch.object(main_window, '_on_reset_tab1') as reset:
+    with mock.patch.object(main_window._tab_txt2epub, '_on_convert_tab1') as conv, \
+            mock.patch.object(main_window._tab_txt2epub, '_on_browse_txt') as browse, \
+            mock.patch.object(main_window._tab_txt2epub, '_on_reset_tab1') as reset:
         main_window._on_shortcut_convert()
         main_window._on_shortcut_open()
         main_window._on_shortcut_reset()
@@ -522,11 +522,11 @@ def test_preview_invalid_regex_uses_regex_invalid(main_window, tmp_path):
     """预览正则 ValueError（非捕获组）→ regex_invalid 友好文案，详情含捕获组。"""
     txt = tmp_path / 'book.txt'
     txt.write_text('第1章 开始\n正文内容', encoding='utf-8')
-    main_window._le_txt.setText(str(txt))
-    main_window._te_reg.setText('(?:第.+章)')  # 0 捕获组 → ValueError
+    main_window._tab_txt2epub._le_txt.setText(str(txt))
+    main_window._tab_txt2epub._te_reg.setText('(?:第.+章)')  # 0 捕获组 → ValueError
 
     with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        main_window._on_preview_chapters()
+        main_window._tab_txt2epub._on_preview_chapters()
 
     crit.assert_called_once()
     assert crit.call_args.args[1] == '错误'
@@ -540,12 +540,12 @@ def test_preview_generic_error_uses_conversion_failed(main_window, tmp_path,
     """预览非 ValueError 异常 → conversion_failed 友好文案。"""
     txt = tmp_path / 'book.txt'
     txt.write_text('第1章 开始\n正文内容', encoding='utf-8')
-    main_window._le_txt.setText(str(txt))
-    monkeypatch.setattr(wmod, 'Txt2Epub',
+    main_window._tab_txt2epub._le_txt.setText(str(txt))
+    monkeypatch.setattr('tab_txt2epub.Txt2Epub',
                         mock.Mock(side_effect=RuntimeError('boom')))
 
     with mock.patch.object(wmod.QMessageBox, 'critical') as crit:
-        main_window._on_preview_chapters()
+        main_window._tab_txt2epub._on_preview_chapters()
 
     crit.assert_called_once()
     msg = crit.call_args.args[2]

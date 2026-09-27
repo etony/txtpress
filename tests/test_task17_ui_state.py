@@ -51,54 +51,54 @@ def test_reset_tab1_restores_all_fields(main_window):
     """tab1 重置：全部输入/选项/状态字段回到默认（断言表）。"""
     win = main_window
     # ---- 灌入非默认值 ----
-    win._le_txt.setText('/tmp/a.txt')
-    win._le_epub.setText('/tmp/a.epub')
-    win._le_title.setText('题')
-    win._le_author.setText('者')
-    win._le_txt_contrib.setText('贡')
-    win._le_txt_date.setText('2020-01-01')
-    win._le_txt_desc.setText('述')
-    win._txt_cover = '/tmp/c.jpg'
-    win._cb_encode.setCurrentIndex(3)
-    win._cb_regex_preset.setCurrentIndex(1)   # 联动会改写 te_reg
-    win._cb_epub_style.setCurrentIndex(1)
-    win._cb_font.setCurrentIndex(2)
-    win._cb_toc_style.setCurrentIndex(3)
-    win._te_reg.setText('custom-regex')
-    win._ordered_chapters = [(0, 'x')]
-    win._ordered_chapters_src = ('a', 'b', 'c')
-    win._detected_encoding = 'gbk'
-    win._detected_path = '/tmp/a.txt'
-    win._txt_dir = '/tmp'
+    win._tab_txt2epub._le_txt.setText('/tmp/a.txt')
+    win._tab_txt2epub._le_epub.setText('/tmp/a.epub')
+    win._tab_txt2epub._le_title.setText('题')
+    win._tab_txt2epub._le_author.setText('者')
+    win._tab_txt2epub._le_txt_contrib.setText('贡')
+    win._tab_txt2epub._le_txt_date.setText('2020-01-01')
+    win._tab_txt2epub._le_txt_desc.setText('述')
+    win._tab_txt2epub._txt_cover = '/tmp/c.jpg'
+    win._tab_txt2epub._cb_encode.setCurrentIndex(3)
+    win._tab_txt2epub._cb_regex_preset.setCurrentIndex(1)   # 联动会改写 te_reg
+    win._tab_txt2epub._cb_epub_style.setCurrentIndex(1)
+    win._tab_txt2epub._cb_font.setCurrentIndex(2)
+    win._tab_txt2epub._cb_toc_style.setCurrentIndex(3)
+    win._tab_txt2epub._te_reg.setText('custom-regex')
+    win._tab_txt2epub._ordered_chapters = [(0, 'x')]
+    win._tab_txt2epub._ordered_chapters_src = ('a', 'b', 'c')
+    win._tab_txt2epub._detected_encoding = 'gbk'
+    win._tab_txt2epub._detected_path = '/tmp/a.txt'
+    win._tab_txt2epub._txt_dir = '/tmp'
 
-    win._on_reset_tab1()
+    win._tab_txt2epub._on_reset_tab1()
 
     # ---- 断言表：字段 → 期望默认值 ----
     text_defaults = (
-        (win._le_txt, ''), (win._le_epub, ''), (win._le_title, ''),
-        (win._le_author, ''), (win._le_txt_contrib, ''),
-        (win._le_txt_date, ''), (win._le_txt_desc, ''),
-        (win._te_reg, wmod.DEFAULT_CHAPTER_REGEX),
+        (win._tab_txt2epub._le_txt, ''), (win._tab_txt2epub._le_epub, ''), (win._tab_txt2epub._le_title, ''),
+        (win._tab_txt2epub._le_author, ''), (win._tab_txt2epub._le_txt_contrib, ''),
+        (win._tab_txt2epub._le_txt_date, ''), (win._tab_txt2epub._le_txt_desc, ''),
+        (win._tab_txt2epub._te_reg, wmod.DEFAULT_CHAPTER_REGEX),
     )
     for widget, expected in text_defaults:
         assert widget.text() == expected, widget.accessibleName() or widget
     combo_defaults = (
-        (win._cb_encode, 0, '文件编码'),
-        (win._cb_regex_preset, 0, '正则预设'),
-        (win._cb_epub_style, 0, 'EPUB 样式'),
-        (win._cb_font, 0, '正文字体'),
-        (win._cb_toc_style, 0, '目录样式'),
+        (win._tab_txt2epub._cb_encode, 0, '文件编码'),
+        (win._tab_txt2epub._cb_regex_preset, 0, '正则预设'),
+        (win._tab_txt2epub._cb_epub_style, 0, 'EPUB 样式'),
+        (win._tab_txt2epub._cb_font, 0, '正文字体'),
+        (win._tab_txt2epub._cb_toc_style, 0, '目录样式'),
     )
     for combo, expected, name in combo_defaults:
         assert combo.currentIndex() == expected, name
-    assert win._txt_cover == ''
-    assert win._cover_label.pixmap() is not None
-    assert not win._cover_label.pixmap().isNull()
-    assert win._ordered_chapters is None
-    assert win._ordered_chapters_src is None
-    assert win._detected_encoding == 'utf-8'
-    assert win._detected_path is None
-    assert win._txt_dir == ''
+    assert win._tab_txt2epub._txt_cover == ''
+    assert win._tab_txt2epub._cover_label.pixmap() is not None
+    assert not win._tab_txt2epub._cover_label.pixmap().isNull()
+    assert win._tab_txt2epub._ordered_chapters is None
+    assert win._tab_txt2epub._ordered_chapters_src is None
+    assert win._tab_txt2epub._detected_encoding == 'utf-8'
+    assert win._tab_txt2epub._detected_path is None
+    assert win._tab_txt2epub._txt_dir == ''
     assert win.statusBar().currentMessage() == '已重置'
 
 
@@ -171,12 +171,12 @@ def test_reset_tab3_restores_all_fields(main_window, tmp_path):
 def test_tab1_rejects_output_equal_to_input(main_window, sample_txt):
     """tab1：输出路径指向输入 TXT 本身 → 拒绝并提示，不启动转换。"""
     win = main_window
-    win._le_txt.setText(sample_txt)
-    win._le_epub.setText(sample_txt)
+    win._tab_txt2epub._le_txt.setText(sample_txt)
+    win._tab_txt2epub._le_epub.setText(sample_txt)
 
     with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab1()
+        win._tab_txt2epub._on_convert_tab1()
 
     warn.assert_called_once()
     assert '输出路径不能与输入文件相同' in warn.call_args.args[2]
@@ -186,12 +186,12 @@ def test_tab1_rejects_output_equal_to_input(main_window, sample_txt):
 def test_tab1_rejects_missing_output_dir(main_window, sample_txt, tmp_path):
     """tab1：输出目录不存在 → 拒绝并提示，不启动转换。"""
     win = main_window
-    win._le_txt.setText(sample_txt)
-    win._le_epub.setText(str(tmp_path / 'no_such_dir' / 'out.epub'))
+    win._tab_txt2epub._le_txt.setText(sample_txt)
+    win._tab_txt2epub._le_epub.setText(str(tmp_path / 'no_such_dir' / 'out.epub'))
 
     with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab1()
+        win._tab_txt2epub._on_convert_tab1()
 
     warn.assert_called_once()
     assert '输出目录不存在' in warn.call_args.args[2]
@@ -203,8 +203,8 @@ def test_tab1_overwrite_confirmation(main_window, sample_txt, tmp_path):
     win = main_window
     out = tmp_path / 'exists.epub'
     out.write_bytes(b'x')
-    win._le_txt.setText(sample_txt)
-    win._le_epub.setText(str(out))
+    win._tab_txt2epub._le_txt.setText(sample_txt)
+    win._tab_txt2epub._le_epub.setText(str(out))
 
     # 用户选 No → 不转换
     with mock.patch.object(wmod.QMessageBox, 'question',
@@ -212,7 +212,7 @@ def test_tab1_overwrite_confirmation(main_window, sample_txt, tmp_path):
                            ) as question, \
             mock.patch.object(wmod.QMessageBox, 'warning'), \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab1()
+        win._tab_txt2epub._on_convert_tab1()
 
     question.assert_called_once()
     assert question.call_args.args[3] == (
@@ -224,7 +224,7 @@ def test_tab1_overwrite_confirmation(main_window, sample_txt, tmp_path):
     with mock.patch.object(wmod.QMessageBox, 'question',
                            return_value=wmod.QMessageBox.StandardButton.Yes), \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab1()
+        win._tab_txt2epub._on_convert_tab1()
 
     run.assert_called_once()
 
@@ -233,13 +233,13 @@ def test_tab1_allows_clean_output_path(main_window, sample_txt, tmp_path):
     """tab1：合法路径（目录存在、目标不存在）→ 直接放行，不弹确认。"""
     win = main_window
     out = tmp_path / 'new.epub'
-    win._le_txt.setText(sample_txt)
-    win._le_epub.setText(str(out))
+    win._tab_txt2epub._le_txt.setText(sample_txt)
+    win._tab_txt2epub._le_epub.setText(str(out))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
             mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_tab1()
+        win._tab_txt2epub._on_convert_tab1()
 
     question.assert_not_called()
     warn.assert_not_called()

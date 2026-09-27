@@ -68,12 +68,7 @@ from theme_manager import theme_manager, Theme
 from error_handler import show_error
 from utils import open_dir
 from tab_base import _ClickableLabel, _DropLineEdit  # noqa: F401  再导出，保测试引用路径
-
-
-# ---- 资源路径 ----
-# 注意：路径常量现在从 constants.py 导入
-_ENCODE_DETECT_SIZE = 4096  # 编码检测时读取的文件前 4096 字节
-_MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能是误输入）
+from tab_txt2epub import TabTxt2Epub
 
 
 # =====================================================================
@@ -109,18 +104,13 @@ class MainWindow(QMainWindow):
 
         # ---- 状态变量 ----
         # 这些变量在窗口生命周期内保持状态，跨函数共享
-        self._txt_cover = ''                       # tab1 封面路径（用户选择的）
+        # （tab1/2/3 的控件与私有状态已随 UI 构建迁移到各自的 Tab 类）
         self._epub_cover_path = ''                 # tab2 封面路径（用于修改 EPUB 元信息）
-        self._txt_dir = ''                         # 当前 TXT 文件所在目录（方便自动填充路径）
         self._epub_dir = ''                        # 当前 EPUB 文件所在目录
         self._config = AppConfig.load(CONFIG_PATH) # 从 config.json 加载的配置
         self._worker: ProgressWorker | None = None # 当前正在运行的后台线程
         self._closing = False                      # 是否正在关窗（关窗期间忽略任务回调/新任务）
-        self._ordered_chapters: list[tuple[int, str]] | None = None  # ChapterDialog 调整后的章节 [(原始索引, 新标题)]
-        self._ordered_chapters_src: tuple[str, str, str] | None = None  # _ordered_chapters 的来源指纹 (txt路径, 正则, 编码)
         self._cc_t2s = None                        # 繁→简转换器（lazy初始化）
-        self._detected_encoding = 'utf-8'          # chardet 检测到的输入编码
-        self._detected_path: str | None = None     # 检测值对应的文件路径（懒检测缓存键）
 
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
@@ -141,7 +131,17 @@ class MainWindow(QMainWindow):
         root.addWidget(self._tabs)
 
         # 按顺序创建三个 Tab
-        self._setup_tab1()   # TXT → EPUB
+        # Tab 通过构造参数拿到本窗口的能力（晚绑定 lambda：测试替换
+        # 本对象上的方法后，Tab 调用会路由到替换后的方法）
+        self._tab_txt2epub = TabTxt2Epub(
+            run_worker=lambda *a, **k: self._run_worker(*a, **k),
+            is_busy=lambda: self._is_busy(),
+            save_config=lambda: self._save_config(),
+            show_status=lambda msg: self.statusBar().showMessage(msg),
+            confirm_output_path=lambda *a, **k: self._confirm_output_path(*a, **k),
+            initial_regex=self._config.chapter_regex,
+        )
+        self._tabs.addTab(self._tab_txt2epub, 'TXT → EPUB')
         self._setup_tab2()   # EPUB → TXT
         self._setup_tab3()   # MOBI → TXT
 
@@ -275,166 +275,6 @@ class MainWindow(QMainWindow):
         """统一的重置后状态更新。"""
         self.statusBar().showMessage('已重置')
         logger.info(f'{tab_name} 重置')
-
-    # ================================================================
-    # Tab 1: TXT → EPUB
-    # ================================================================
-
-    def _setup_tab1(self):
-        """
-        构建 Tab 1 的 UI 控件。
-
-        布局（从上到下）：
-          源文件    → TXT 文件路径 + EPUB 保存路径
-          书籍信息  → 书名 / 作者 / 贡献者 / 日期 / 描述
-          封面      → 封面图片 + 选择按钮
-          高级选项  → 文件编码 + 章节正则
-          操作      → 开始转换 / →MOBI / 目录预览 / 重置
-        """
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(8)
-        layout.setContentsMargins(6, 6, 6, 6)
-
-        # ---- 源文件 ----
-        grp = QGroupBox('源文件')
-        gl = QVBoxLayout(grp)
-        gl.setSpacing(10)
-
-        self._le_txt = _DropLineEdit('.txt')
-        self._le_txt.setPlaceholderText('选择 TXT 源文件…')
-        self._le_txt.setAccessibleName('TXT 源文件路径')
-        h = self._create_file_row('TXT 文件:', self._le_txt,
-                                  self._on_browse_txt)
-        gl.addLayout(h)
-
-        self._le_epub = QLineEdit()
-        self._le_epub.setPlaceholderText('自动生成或手动选择…')
-        self._le_epub.setAccessibleName('EPUB 保存路径')
-        h = self._create_file_row('EPUB 保存:', self._le_epub,
-                                  self._on_browse_epub)
-        gl.addLayout(h)
-        layout.addWidget(grp)
-
-        # ---- 书籍信息 ----
-        self._cover_label = _ClickableLabel()
-        self._cover_label.setObjectName('cover_label')
-        self._le_title = QLineEdit()
-        self._le_title.setAccessibleName('书名')
-        self._le_author = QLineEdit()
-        self._le_author.setAccessibleName('作者')
-        self._le_txt_contrib = QLineEdit()
-        self._le_txt_date = QLineEdit()
-        self._le_txt_desc = QLineEdit()
-
-        grp = self._create_book_info_group(
-            cover_label=self._cover_label,
-            cover_clicked=self._on_choose_cover,
-            fields=[
-                {'label': '书名:', 'widget': self._le_title, 'row': 0, 'col': 0,
-                 'placeholder': '默认 = 文件名'},
-                {'label': '作者:', 'widget': self._le_author, 'row': 0, 'col': 2,
-                 'placeholder': '默认 = 作者'},
-                {'label': '贡献者:', 'widget': self._le_txt_contrib, 'row': 1, 'col': 0,
-                 'placeholder': '默认 etony.an@gmail.com'},
-                {'label': '日期:', 'widget': self._le_txt_date, 'row': 1, 'col': 2,
-                 'placeholder': '默认当前时间 (yyyy-mm-dd)'},
-                {'label': '描述:', 'widget': self._le_txt_desc, 'row': 2, 'col': 0,
-                 'span': (1, 3), 'placeholder': 'EPUB 描述信息 (dc:description，可选)'},
-            ],
-        )
-        layout.addWidget(grp)
-
-        # ---- 高级选项 ----
-        grp = QGroupBox('选项')
-        gl = QVBoxLayout(grp)
-        gl.setSpacing(10)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel('文件编码:'))
-        self._cb_encode = QComboBox()
-        self._cb_encode.addItems(
-            ['自动检测', 'utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis'])
-        row.addWidget(self._cb_encode)
-        row.addSpacing(12)
-        
-        # EPUB样式
-        row.addWidget(QLabel('EPUB样式:'))
-        self._cb_epub_style = QComboBox()
-        self._load_epub_styles()
-        row.addWidget(self._cb_epub_style)
-        row.addSpacing(12)
-        
-        # 章节正则预设
-        row.addWidget(QLabel('正则预设:'))
-        self._cb_regex_preset = QComboBox()
-        self._cb_regex_preset.addItems(list(REGEX_PRESETS.keys()))
-        self._cb_regex_preset.currentTextChanged.connect(self._on_regex_preset_changed)
-        row.addWidget(self._cb_regex_preset)
-        row.addStretch()
-        gl.addLayout(row)
-
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel('章节正则:'))
-        self._te_reg = QLineEdit()
-        self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
-        self._te_reg.setText(
-            self._config.chapter_regex or DEFAULT_CHAPTER_REGEX)
-        row2.addWidget(self._te_reg)
-        gl.addLayout(row2)
-
-        # 字体和目录样式
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel('正文字体:'))
-        self._cb_font = QComboBox()
-        self._cb_font.addItems(list(FONT_PRESETS.keys()))
-        row3.addWidget(self._cb_font)
-        row3.addSpacing(12)
-        
-        row3.addWidget(QLabel('目录样式:'))
-        self._cb_toc_style = QComboBox()
-        self._cb_toc_style.addItems(list(TOC_STYLES.keys()))
-        row3.addWidget(self._cb_toc_style)
-        row3.addStretch()
-        gl.addLayout(row3)
-
-        layout.addWidget(grp)
-
-        # ---- 操作 ----
-        grp = QGroupBox('操作')
-        gl = QHBoxLayout(grp)
-        gl.setSpacing(10)
-
-        btn = QPushButton('▶ 开始转换')
-        btn.setObjectName('btn_action')
-        btn.setToolTip('将 TXT 转换为 EPUB（Ctrl+Enter）')
-        btn.clicked.connect(self._on_convert_tab1)
-        gl.addWidget(btn)
-
-        btn = QPushButton('→MOBI')
-        btn.setObjectName('btn_info')
-        btn.setToolTip('将 EPUB 转换为 MOBI（需要 Calibre）')
-        btn.clicked.connect(self._on_convert_mobi)
-        gl.addWidget(btn)
-
-        gl.addStretch()
-
-        btn = QPushButton('📑 目录预览')
-        btn.setToolTip('预览 TXT 文件中的章节列表')
-        btn.setObjectName('btn_secondary')
-        btn.clicked.connect(self._on_preview_chapters)
-        gl.addWidget(btn)
-
-        btn = QPushButton('↺ 重置')
-        btn.setObjectName('btn_reset')
-        btn.setToolTip('清空所有输入 (Ctrl+R)')
-        btn.clicked.connect(self._on_reset_tab1)
-        gl.addWidget(btn)
-
-        layout.addWidget(grp)
-        layout.addStretch()
-
-        self._tabs.addTab(tab, 'TXT → EPUB')
 
     # ================================================================
     # Tab 2: EPUB → TXT
@@ -758,7 +598,7 @@ class MainWindow(QMainWindow):
             path = urls[0].toLocalFile()
             if path.lower().endswith('.txt'):
                 self._tabs.setCurrentIndex(0)
-                self._load_txt_file(path)
+                self._tab_txt2epub.load_file(path)
             elif path.lower().endswith('.epub'):
                 self._tabs.setCurrentIndex(1)
                 self._load_epub_file(path)
@@ -770,98 +610,6 @@ class MainWindow(QMainWindow):
     # Tab 1：槽函数
     # ================================================================
 
-    def _on_browse_txt(self):
-        """浏览按钮——打开文件选择对话框，选择 TXT 文件。"""
-        path, _ = QFileDialog.getOpenFileName(
-            self, '选择 TXT 文件', '.', '*.txt;;All Files(*)')
-        if path:
-            self._load_txt_file(path)
-
-    def _detect_encoding(self, path: str) -> tuple[str, str] | None:
-        """读取文件前 _ENCODE_DETECT_SIZE 字节，用 chardet 检测编码。
-
-        返回 (编码, 语言)；文件不存在或读取失败返回 None，
-        由调用方决定是否缓存（失败不缓存，避免把错误结果钉死）。
-        """
-        try:
-            with open(path, 'rb') as f:
-                data = f.read(_ENCODE_DETECT_SIZE)
-        except OSError:
-            return None
-        # chardet.detect 可能返回 None 或字段缺失，需要安全兜底
-        info = chardet.detect(data) or {}
-        return info.get('encoding') or 'utf-8', info.get('language') or '未知'
-
-    def _load_txt_file(self, path: str):
-        """
-        加载 TXT 文件到界面。
-
-        这是浏览和拖放的公共入口。做了三件事：
-        1. 把路径设到输入框
-        2. 自动填充 EPUB 输出路径、书名、作者、描述
-        3. 用 chardet 检测文件编码，显示在状态栏
-
-        自动填充逻辑：
-        - EPUB 输出路径 = TXT 同目录 + 同名 .epub
-        - 书名和作者 = 文件名（不含扩展名）
-        - 描述 = DEFAULT_DESC（默认描述文字）
-
-        编码检测：
-        用 chardet 库读取文件前 4096 字节判断编码。
-        检测结果仅供参考，用户可以在"高级选项"中手动选择合适的编码。
-        """
-        self._le_txt.setText(path)
-        self._txt_dir, fname = os.path.split(path)
-        base, _ = os.path.splitext(fname)
-
-        # 自动填充：书名/作者用文件名，EPUB 输出路径与 TXT 同目录
-        self._le_epub.setText(os.path.join(self._txt_dir, base + '.epub'))
-        self._le_title.setText(base.strip())
-        self._le_author.setText(base.strip())
-        self._le_txt_desc.setText(DEFAULT_DESC)
-
-        # 编码检测——读取文件前 4096 字节自动判断编码
-        # chardet.detect 返回 {"encoding": "utf-8", "confidence": 0.99, ...}
-        enc, lang = self._detect_encoding(path) or ('utf-8', '未知')
-        self._detected_encoding = enc
-        self._detected_path = path
-        self.statusBar().showMessage(f'文件: {fname}  编码: {enc}')
-        logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
-
-        logger.info(f'选择 TXT: {path}')
-
-    def _current_txt_encoding(self) -> str:
-        """返回 tab1 当前生效的输入编码。
-
-        "自动检测"（index=0）时返回 chardet 结果，
-        否则返回用户手动选择的编码。检测失败回退 utf-8。
-        """
-        if self._cb_encode.currentIndex() != 0:
-            return self._cb_encode.currentText()
-        # 手敲/粘贴路径不会经过 _load_txt_file，缓存的检测值可能属于
-        # 上一个文件，因此路径变化时懒检测一次并缓存；同路径不重复读盘
-        path = self._le_txt.text().strip()
-        if path != self._detected_path:
-            detected = self._detect_encoding(path)
-            if detected is None:
-                # 文件不存在/读取失败：不缓存，直接回退 utf-8，
-                # 避免沿用上一个文件的检测值
-                return 'utf-8'
-            self._detected_encoding = detected[0]
-            self._detected_path = path
-        return self._detected_encoding or 'utf-8'
-
-    def _on_browse_epub(self):
-        """浏览——选择 EPUB 保存路径（必须是 .epub 扩展名）。"""
-        if not self._le_txt.text():
-            self.statusBar().showMessage('请先选择 TXT 文件')
-            return
-        path, _ = QFileDialog.getSaveFileName(
-            self, 'EPUB 保存位置',
-            os.path.join(self._txt_dir, 'output'), '*.epub')
-        if path:
-            self._le_epub.setText(path)
-
     def _pick_image(self, title='选择封面') -> str:
         """打开图片选择对话框，返回选中路径或空字符串。
 
@@ -871,195 +619,6 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(
             self, title, '.', 'Images (*.jpg *.png *.jpeg);;All Files(*)')
         return path or ''
-
-    def _on_choose_cover(self):
-        """选择封面图片（tab1）。"""
-        self._on_choose_cover_impl('_txt_cover', self._cover_label)
-
-    def _parse_key(self) -> tuple[str, str, str]:
-        """当前解析输入的指纹：(txt路径, 生效正则, 生效编码)。
-
-        _ordered_chapters 里的索引绑定某次解析结果，
-        换文件/改正则/改编码后旧索引会错配到别的章节，
-        因此预览时记录指纹，转换时比对，不一致就丢弃顺序。
-        """
-        txt = self._le_txt.text().strip()
-        reg = self._te_reg.text().strip()
-        if len(reg) < _MIN_REGEX_LEN:
-            reg = DEFAULT_CHAPTER_REGEX
-        # 生效编码：自动检测时用 chardet 结果，手动时用所选编码
-        enc = self._current_txt_encoding()
-        return (txt, reg, enc)
-
-    def _on_preview_chapters(self):
-        """
-        目录预览。
-
-        用当前设置的编码和正则解析 TXT，提取章节标题列表，
-        弹出 ChapterDialog 供用户查看、排序、重命名。
-        如果用户调整了顺序，保存到 self._ordered_chapters。
-
-        异常处理：
-        - 如果文件不存在 → 警告提示
-        - 如果解析出错 → 弹出错误对话框 + 日志记录
-        这样可以避免用户因为乱选文件导致程序崩溃。
-        """
-        txt = self._le_txt.text().strip()
-        if not txt or not os.path.exists(txt):
-            QMessageBox.warning(self, '提示', '请先选择有效的 TXT 文件')
-            return
-
-        try:
-            conv = Txt2Epub(txt, self._le_epub.text() or txt + '.epub')
-            conv.encoding = self._current_txt_encoding()
-            reg = self._te_reg.text().strip()
-            if len(reg) >= _MIN_REGEX_LEN:
-                conv.regex = reg
-            chapters = conv.get_chapters()
-            dlg = ChapterDialog(chapters, self)
-            # exec() 返回 QDialog.Accepted（确定）或 Rejected（关闭）
-            if dlg.exec():
-                items = dlg.get_ordered_items()
-                # get_ordered_items 已 strip，原始标题也要 strip 才能正确判"未改动"
-                original = [(i, t.strip()) for i, t in enumerate(chapters)]
-                if items != original:
-                    self._ordered_chapters = items
-                    # 记录来源指纹，转换时校验，输入变化后旧索引作废
-                    self._ordered_chapters_src = self._parse_key()
-                    self.statusBar().showMessage(
-                        f'章节顺序已调整（{len(items)} 章）')
-                else:
-                    self._ordered_chapters = None
-                    self._ordered_chapters_src = None
-        except ValueError as e:
-            show_error(self, '错误', 'regex_invalid', str(e))
-            logger.exception('目录预览失败')
-        except Exception as e:
-            show_error(self, '错误', 'conversion_failed', str(e))
-            logger.exception('目录预览失败')
-
-    def _on_reset_tab1(self):
-        """重置 tab1 的所有输入（含选项组下拉，全部回到默认值）。"""
-        for w in (self._le_txt, self._le_epub, self._le_title,
-                  self._le_author, self._le_txt_contrib,
-                  self._le_txt_date, self._le_txt_desc):
-            w.clear()
-        self._txt_cover = ''
-        self._reset_cover(self._cover_label)
-        self._cb_encode.setCurrentIndex(0)
-        # 选项组补齐：正则预设/EPUB 样式/正文字体/目录样式回到默认项。
-        # 预设必须先于 te_reg 重置（预设联动会写入 te_reg），
-        # 最后统一把正则设为默认值，保证两者状态一致
-        self._cb_regex_preset.setCurrentIndex(0)
-        self._cb_epub_style.setCurrentIndex(0)
-        self._cb_font.setCurrentIndex(0)
-        self._cb_toc_style.setCurrentIndex(0)
-        self._detected_encoding = 'utf-8'
-        self._detected_path = None
-        self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
-        self._ordered_chapters = None
-        self._ordered_chapters_src = None
-        self._txt_dir = ''  # 源文件目录缓存（浏览保存路径的默认目录）
-        self._reset_status('tab1')
-
-    def _on_convert_tab1(self):
-        """
-        开始 TXT→EPUB 转换。
-
-        1. 校验输入（文件存在、输出路径已填）
-        2. 创建 Txt2Epub 实例，设置用户填写的属性
-        3. 通过 _run_worker 在后台线程执行
-
-        注意：只有用户填写了值的字段才会传给转换器，
-        空字段使用 Txt2Epub 的默认值。这样可以保持默认行为一致性。
-        """
-        txt = self._le_txt.text().strip()
-        epub = self._le_epub.text().strip()
-        if not txt or not os.path.exists(txt):
-            QMessageBox.warning(self, '提示', '请选择有效的 TXT 文件')
-            return
-        if not epub:
-            QMessageBox.warning(self, '提示', '请指定 EPUB 保存路径')
-            return
-        if not self._confirm_output_path(txt, epub):
-            return
-
-        # 先校验最终会生效的正则（短于阈值回退默认），
-        # 非法正则不写入 config，也避免错误延迟到 worker 里才弹窗
-        reg = self._te_reg.text().strip()
-        effective_regex = (reg if len(reg) >= _MIN_REGEX_LEN
-                           else DEFAULT_CHAPTER_REGEX)
-        try:
-            validate_chapter_regex(effective_regex)
-        except ValueError as e:
-            QMessageBox.warning(self, '提示', str(e))
-            return
-
-        self._save_config()
-
-        conv = Txt2Epub(txt, epub)
-        # 只把用户填了值的字段传给转换器
-        if self._le_title.text().strip():
-            conv.title = self._le_title.text().strip()
-        if self._le_author.text().strip():
-            conv.author = self._le_author.text().strip()
-        if self._le_txt_contrib.text().strip():
-            conv.contributor = self._le_txt_contrib.text().strip()
-        if self._le_txt_date.text().strip():
-            conv.date = self._le_txt_date.text().strip()
-        if self._le_txt_desc.text().strip():
-            conv.description = self._le_txt_desc.text().strip()
-        if self._txt_cover:
-            conv.cover_path = self._txt_cover
-        conv.encoding = self._current_txt_encoding()
-        if len(reg) >= _MIN_REGEX_LEN:
-            conv.regex = reg
-        # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
-        # 别的章节（索引通常仍合法，补尾救不了），直接丢弃本次顺序
-        order = self._ordered_chapters
-        if order is not None and self._ordered_chapters_src != self._parse_key():
-            order = None
-            self.statusBar().showMessage('章节顺序因输入变化已失效，按原序转换')
-            logger.info('章节顺序因输入变化已失效，按原序转换')
-        conv.set_chapter_order(order)
-        
-        # 加载EPUB样式
-        style_name = self._cb_epub_style.currentText()
-        css_path = os.path.join(STYLES_DIR, f'{style_name}.css')
-        if os.path.exists(css_path):
-            conv.load_css_from_file(css_path)
-        
-        # 应用正文字体和目录样式（追加覆盖规则，对所有样式文件都生效）
-        conv.apply_text_style(
-            FONT_PRESETS.get(self._cb_font.currentText(), ''),
-            TOC_STYLES.get(self._cb_toc_style.currentText(), ''),
-        )
-
-        self._run_worker(
-            target=conv.convert,
-            success_msg='TXT→EPUB 转换完成',
-            dir_to_open=os.path.dirname(epub),
-        )
-
-    def _on_convert_mobi(self):
-        """
-        EPUB→MOBI（框架接口）。
-
-        当前只是占位符，因为 MOBI 转换需要 Calibre 的 ebook-convert 工具。
-        等后续实现真正转换。
-
-        用 NotImplementedError 而不是静默失败，让用户知道这是待实现功能。
-        """
-        epub_path = self._le_epub.text().strip()
-        if not epub_path:
-            QMessageBox.warning(self, '提示', '请先生成或指定 EPUB 文件')
-            return
-        mobi_path = epub_path.rsplit('.', 1)[0] + '.mobi'
-        try:
-            conv = Epub2Mobi(epub_path, mobi_path)
-            conv.convert()
-        except NotImplementedError as e:
-            QMessageBox.information(self, '提示', str(e))
 
     # ================================================================
     # Tab 2：槽函数
@@ -1460,7 +1019,7 @@ class MainWindow(QMainWindow):
             return
         idx = self._tabs.currentIndex()
         if idx == 0:
-            self._on_convert_tab1()
+            self._tab_txt2epub.convert()
         elif idx == 1:
             self._on_convert_tab2()
         else:
@@ -1473,7 +1032,7 @@ class MainWindow(QMainWindow):
             return
         idx = self._tabs.currentIndex()
         if idx == 0:
-            self._on_browse_txt()
+            self._tab_txt2epub.open_file()
         elif idx == 1:
             self._on_browse_in_epub()
         else:
@@ -1486,7 +1045,7 @@ class MainWindow(QMainWindow):
             return
         idx = self._tabs.currentIndex()
         if idx == 0:
-            self._on_reset_tab1()
+            self._tab_txt2epub.reset()
         elif idx == 1:
             self._on_reset_tab2()
         else:
@@ -1538,24 +1097,6 @@ class MainWindow(QMainWindow):
 
         painter.end()
         return QIcon(pixmap)
-
-    def _on_regex_preset_changed(self, preset_name: str):
-        """正则预设变更处理"""
-        regex = REGEX_PRESETS.get(preset_name, '')
-        if regex:
-            self._te_reg.setText(regex)
-        # 如果是"自定义"，清空让用户输入
-        if preset_name == '自定义（用户输入）':
-            self._te_reg.clear()
-
-    def _load_epub_styles(self):
-        """加载可用的EPUB样式"""
-        if os.path.exists(STYLES_DIR):
-            for f in sorted(os.listdir(STYLES_DIR)):
-                if f.endswith('.css'):
-                    self._cb_epub_style.addItem(f.replace('.css', ''))
-        if self._cb_epub_style.count() == 0:
-            self._cb_epub_style.addItem('default')
 
     @staticmethod
     def _create_file_row(label: str, line_edit: QLineEdit,
@@ -1821,18 +1362,21 @@ class MainWindow(QMainWindow):
         tab1 的编码存的是下拉显示文本（语义值，如 '自动检测'/'gbk'），
         避免下拉选项增删后序号错位。
         """
+        # 配置逻辑保留在 MainWindow（最小方案）；tab1 控件已迁到
+        # TabTxt2Epub，通过实例直接读取（计划 Step 3.6 允许的形态）
+        t1 = self._tab_txt2epub
         self._config = AppConfig(
-            txt_encoding=self._cb_encode.currentText(),
+            txt_encoding=t1._cb_encode.currentText(),
             out_encoding=self._cb_out_code.currentText(),
             chapter_sep=self._cb_sep.currentText(),
-            chapter_regex=self._te_reg.text().strip(),
+            chapter_regex=t1._te_reg.text().strip(),
             fanjian_enabled=self._chb_fanjian.isChecked(),
             window_geometry=bytes(self.saveGeometry()),
             theme=self._theme_manager.get_current_theme().value,
-            regex_preset=self._cb_regex_preset.currentText(),
-            epub_style=self._cb_epub_style.currentText(),
-            font_family=self._cb_font.currentText(),
-            toc_style=self._cb_toc_style.currentText(),
+            regex_preset=t1._cb_regex_preset.currentText(),
+            epub_style=t1._cb_epub_style.currentText(),
+            font_family=t1._cb_font.currentText(),
+            toc_style=t1._cb_toc_style.currentText(),
         )
         self._config.save(CONFIG_PATH)
 
@@ -1846,6 +1390,7 @@ class MainWindow(QMainWindow):
         按当前下拉项映射成显示文本后再恢复。
         """
         cfg = self._config
+        t1 = self._tab_txt2epub
         # 编码（新格式存语义值/显示文本，旧格式存 ComboBox 序号）
         # 双格式共存期兼容：老版本序号配置不再产生后，本分支可连同
         # findText 回退一起简化
@@ -1854,15 +1399,15 @@ class MainWindow(QMainWindow):
                 isinstance(raw, str) and raw.isdigit()):
             # 旧版本存的是 ComboBox 序号，转换成显示文本
             idx = int(raw)
-            text = (self._cb_encode.itemText(idx)
-                    if 0 <= idx < self._cb_encode.count() else '自动检测')
+            text = (t1._cb_encode.itemText(idx)
+                    if 0 <= idx < t1._cb_encode.count() else '自动检测')
         elif isinstance(raw, str) and raw:
             text = raw
         else:
             text = '自动检测'
         # 非法值 findText 返回 -1，回退到默认第 0 项（自动检测）
-        enc_idx = self._cb_encode.findText(text)
-        self._cb_encode.setCurrentIndex(enc_idx if enc_idx >= 0 else 0)
+        enc_idx = t1._cb_encode.findText(text)
+        t1._cb_encode.setCurrentIndex(enc_idx if enc_idx >= 0 else 0)
         out_idx = self._cb_out_code.findText(cfg.out_encoding)
         self._cb_out_code.setCurrentIndex(out_idx if out_idx >= 0 else 0)
         # 分隔符
@@ -1870,7 +1415,7 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._cb_sep.setCurrentIndex(idx)
         # 正则
-        self._te_reg.setText(
+        t1._te_reg.setText(
             cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # 繁简
         self._chb_fanjian.setChecked(cfg.fanjian_enabled)
@@ -1887,24 +1432,24 @@ class MainWindow(QMainWindow):
             self._theme_btn.setIcon(self._create_theme_icon(cfg.theme))
         # 正则预设
         if hasattr(cfg, 'regex_preset') and cfg.regex_preset:
-            idx = self._cb_regex_preset.findText(cfg.regex_preset)
+            idx = t1._cb_regex_preset.findText(cfg.regex_preset)
             if idx >= 0:
-                self._cb_regex_preset.setCurrentIndex(idx)
+                t1._cb_regex_preset.setCurrentIndex(idx)
         # EPUB样式
         if hasattr(cfg, 'epub_style') and cfg.epub_style:
-            idx = self._cb_epub_style.findText(cfg.epub_style)
+            idx = t1._cb_epub_style.findText(cfg.epub_style)
             if idx >= 0:
-                self._cb_epub_style.setCurrentIndex(idx)
+                t1._cb_epub_style.setCurrentIndex(idx)
         # 字体
         if hasattr(cfg, 'font_family') and cfg.font_family:
-            idx = self._cb_font.findText(cfg.font_family)
+            idx = t1._cb_font.findText(cfg.font_family)
             if idx >= 0:
-                self._cb_font.setCurrentIndex(idx)
+                t1._cb_font.setCurrentIndex(idx)
         # 目录样式
         if hasattr(cfg, 'toc_style') and cfg.toc_style:
-            idx = self._cb_toc_style.findText(cfg.toc_style)
+            idx = t1._cb_toc_style.findText(cfg.toc_style)
             if idx >= 0:
-                self._cb_toc_style.setCurrentIndex(idx)
+                t1._cb_toc_style.setCurrentIndex(idx)
 
     def closeEvent(self, event):
         """窗口关闭时取消运行中的任务并保存配置。

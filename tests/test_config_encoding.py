@@ -96,7 +96,7 @@ def test_models_load_legacy_int_does_not_crash(config_path):
 def test_window_save_stores_combo_text(make_window):
     """_save_config 存下拉显示文本（语义值），不是 index。"""
     win = make_window()
-    win._cb_encode.setCurrentText('gbk')
+    win._tab_txt2epub._cb_encode.setCurrentText('gbk')
     win._save_config()
     data = json.loads(
         Path(wmod.CONFIG_PATH).read_text(encoding='utf-8'))
@@ -106,11 +106,11 @@ def test_window_save_stores_combo_text(make_window):
 def test_window_roundtrip_semantic_value(make_window):
     """语义值 save → 新窗口 load → 下拉恢复同一选项。"""
     win1 = make_window()
-    win1._cb_encode.setCurrentText('gb18030')
+    win1._tab_txt2epub._cb_encode.setCurrentText('gb18030')
     win1._save_config()
 
     win2 = make_window()
-    assert win2._cb_encode.currentText() == 'gb18030'
+    assert win2._tab_txt2epub._cb_encode.currentText() == 'gb18030'
 
 
 # ================================================================
@@ -121,23 +121,23 @@ def test_window_roundtrip_semantic_value(make_window):
 def test_window_restore_legacy_int_index(make_window):
     """旧 config 存序号 2 → 恢复成当前下拉第 2 项的文本（gbk）。"""
     win = make_window({'txt_encoding': 2})
-    expected = win._cb_encode.itemText(2)
+    expected = win._tab_txt2epub._cb_encode.itemText(2)
     assert expected == 'gbk'
-    assert win._cb_encode.currentText() == 'gbk'
+    assert win._tab_txt2epub._cb_encode.currentText() == 'gbk'
 
 
 def test_window_restore_legacy_digit_string(make_window):
     """旧 config 存数字串 '4' → 恢复成第 4 项文本（gb18030）。"""
     win = make_window({'txt_encoding': '4'})
-    assert win._cb_encode.currentText() == win._cb_encode.itemText(4)
-    assert win._cb_encode.currentText() == 'gb18030'
+    assert win._tab_txt2epub._cb_encode.currentText() == win._tab_txt2epub._cb_encode.itemText(4)
+    assert win._tab_txt2epub._cb_encode.currentText() == 'gb18030'
 
 
 def test_window_restore_legacy_int_out_of_range(make_window):
     """序号越界（选项已增删）→ 回退默认第 0 项，不崩不错位。"""
     win = make_window({'txt_encoding': 99})
-    assert win._cb_encode.currentIndex() == 0
-    assert win._cb_encode.currentText() == '自动检测'
+    assert win._tab_txt2epub._cb_encode.currentIndex() == 0
+    assert win._tab_txt2epub._cb_encode.currentText() == '自动检测'
 
 
 def test_window_upgrade_legacy_index_on_first_save(make_window):
@@ -147,7 +147,7 @@ def test_window_upgrade_legacy_index_on_first_save(make_window):
     _save_config 落盘，钉死 JSON 里是 str 语义值而非 int 序号。
     """
     win = make_window({'txt_encoding': 2})
-    assert win._cb_encode.currentText() == 'gbk'
+    assert win._tab_txt2epub._cb_encode.currentText() == 'gbk'
     win._save_config()
     data = json.loads(
         Path(wmod.CONFIG_PATH).read_text(encoding='utf-8'))
@@ -171,5 +171,5 @@ def test_window_upgrade_legacy_index_on_first_save(make_window):
 def test_window_restore_invalid_value_falls_back(make_window, raw):
     """非法/未知值一律回退到默认第 0 项（自动检测），不崩溃。"""
     win = make_window({'txt_encoding': raw})
-    assert win._cb_encode.currentIndex() == 0
-    assert win._cb_encode.currentText() == '自动检测'
+    assert win._tab_txt2epub._cb_encode.currentIndex() == 0
+    assert win._tab_txt2epub._cb_encode.currentText() == '自动检测'
