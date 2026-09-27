@@ -16,7 +16,6 @@ Task 14：error_handler 友好错误提示——_run_worker 的 error_code 映�
 调用点错误码分配、_on_preview_chapters 的 regex_invalid 接入。
 """
 import os
-import sys
 import threading
 import time
 import unittest.mock as mock

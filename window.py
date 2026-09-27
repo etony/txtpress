@@ -41,7 +41,7 @@ from loguru import logger
 from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout,
-    QTabWidget, QGroupBox,
+    QTabWidget,
     QPushButton, QProgressBar,
     QMessageBox, QApplication,
 )
