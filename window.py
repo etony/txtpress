@@ -67,87 +67,13 @@ from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRES
 from theme_manager import theme_manager, Theme
 from error_handler import show_error
 from utils import open_dir
+from tab_base import _ClickableLabel, _DropLineEdit  # noqa: F401  再导出，保测试引用路径
 
 
 # ---- 资源路径 ----
 # 注意：路径常量现在从 constants.py 导入
 _ENCODE_DETECT_SIZE = 4096  # 编码检测时读取的文件前 4096 字节
 _MIN_REGEX_LEN = 5          # 自定义正则的最少字符数（太短可能是误输入）
-
-
-# ---- 辅助控件：可点击标签 ----
-# QLabel 默认没有 clicked 信号，这个子类加了一个。
-# 在 tab1 和 tab2 中，点击封面图片可以更换封面。
-# 为什么不直接用 QPushButton？因为 QPushButton 不能显示图片缩放效果，
-# 而 QLabel 设置 setScaledContents(True) 可以自动缩放图片到合适大小。
-
-class _ClickableLabel(QWidget):
-    """支持 clicked 信号的 QWidget，用 paintEvent 自绘制封面。"""
-    clicked = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
-        self._pixmap = QPixmap()
-
-    def setPixmap(self, pixmap):
-        self._pixmap = pixmap
-        self.update()
-
-    def pixmap(self):
-        return self._pixmap
-
-    def paintEvent(self, event):
-        if self._pixmap and not self._pixmap.isNull():
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            # 保持宽高比缩放图片，居中显示
-            scaled = self._pixmap.scaled(
-                self.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            x = (self.width() - scaled.width()) // 2
-            y = (self.height() - scaled.height()) // 2
-            painter.drawPixmap(x, y, scaled)
-
-    def mousePressEvent(self, event):
-        self.clicked.emit()
-
-    def keyPressEvent(self, event):
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self.clicked.emit()
-        else:
-            super().keyPressEvent(event)
-
-
-class _DropLineEdit(QLineEdit):
-    """支持拖放文件的 QLineEdit，通过构造参数指定接受的扩展名。
-
-    用法：
-        le = _DropLineEdit('.txt')  # 只接受 .txt 文件
-
-    拖放检测流程：
-    dragEnterEvent: 检查拖入内容是否包含文件 URL，且是否符合扩展名要求
-    dropEvent:      如果通过检查，把文件路径填入文本框
-    """
-    def __init__(self, ext: str, parent=None):
-        super().__init__(parent)
-        self._ext = ext
-        self.setAcceptDrops(True)
-
-    def dragEnterEvent(self, event):
-        """拖入事件：检查文件扩展名是否符合要求。"""
-        if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if len(urls) == 1 and urls[0].toLocalFile().lower().endswith(self._ext):
-                event.acceptProposedAction()
-
-    def dropEvent(self, event):
-        """放下事件：将文件路径填入文本框。"""
-        urls = event.mimeData().urls()
-        if urls:
-            self.setText(urls[0].toLocalFile())
 
 
 # =====================================================================
