@@ -19,6 +19,8 @@
 | 主题切换 | 深色/浅色主题切换，状态栏太阳/月亮图标 |
 | 章节正则预设 | 4 种常用正则预设 + 自定义输入 |
 | EPUB 样式选择 | 3 种内置样式（default/minimal/modern） |
+| EPUB 字体选择 | 8 种内置正文字体预设（宋体/黑体/微软雅黑/思源系列/霞鹜文楷等） |
+| 目录样式 | 5 种目录符号样式（默认/圆点/圆圈/无标记/数字） |
 
 ## 环境要求
 
@@ -82,7 +84,7 @@ txtpress/
 ├── README.md                    # 本文件
 ├── AGENTS.md                    # AI 协作约定
 ├── config.json                  # 用户偏好配置（自动生成）
-├── docs/                        # 设计文档与实施计划
+├── docs/superpowers/            # 实施计划（plans/）与设计文档（specs/）
 ├── cover.jpeg                   # 根目录副本（与 resources/images/cover.jpeg 重复，遗留待清理）
 ├── resources/
 │   ├── theme.qss                # 浅色主题 QSS 样式表
@@ -163,7 +165,7 @@ txtpress/
 |---|---|
 | `BookInfo` | EPUB 书籍元数据（title / creator / contributor / date / description / cover） |
 | `ConvertOptions` | TXT → EPUB 转换参数集合，由 `Txt2Epub.configure()` 批量应用 |
-| `AppConfig` | 用户偏好配置，通过 config.json 序列化（编码、分隔符、正则、繁简开关、主题、正则预设、EPUB 样式） |
+| `AppConfig` | 用户偏好配置，通过 config.json 序列化（编码、分隔符、正则、繁简开关、主题、正则预设、EPUB 样式、EPUB 字体、目录样式） |
 
 `AppConfig.load()` 自动忽略 JSON 中的多余字段，`save()` 以中文友好的格式写入。`window_geometry` 使用 hex 字符串序列化 bytes 类型。
 

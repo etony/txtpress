@@ -75,7 +75,7 @@ pip install -r requirements-dev.txt   # 开发依赖
 
 ## Workflow
 
-- 每次代码改动完成后自动 `git add -A && git commit`，提交信息用英文简述改动内容。
+- 每次代码改动完成后自动 `git add -A && git commit`，提交信息用英文简述改动内容， 并自动 `git push` 推送代码改动到github
 
 ## 重构记录
 
