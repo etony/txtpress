@@ -1908,10 +1908,11 @@ class MainWindow(QMainWindow):
         下次启动时通过 _restore_config 恢复。
 
         注意：这里保存的是"输出编码"（tab2 的编码 ComboBox），
-        而 tab1 的编码存储的是 ComboBox index（因为还有"自动检测"选项）。
+        tab1 的编码存的是下拉显示文本（语义值，如 '自动检测'/'gbk'），
+        避免下拉选项增删后序号错位。
         """
         self._config = AppConfig(
-            txt_encoding=self._cb_encode.currentIndex(),
+            txt_encoding=self._cb_encode.currentText(),
             out_encoding=self._cb_out_code.currentText(),
             chapter_sep=self._cb_sep.currentText(),
             chapter_regex=self._te_reg.text().strip(),
@@ -1933,10 +1934,19 @@ class MainWindow(QMainWindow):
         这样即使 config.json 被手动编辑成了非法值，也不会崩溃。
         """
         cfg = self._config
-        # 编码（txt_encoding 存储的是 ComboBox index）
-        # 范围检查避免 config.json 损坏导致 IndexError
-        if 0 <= cfg.txt_encoding < self._cb_encode.count():
-            self._cb_encode.setCurrentIndex(cfg.txt_encoding)
+        # 编码（新格式存语义值/显示文本，旧格式存 ComboBox 序号）
+        raw = cfg.txt_encoding
+        if isinstance(raw, int) or (isinstance(raw, str) and raw.isdigit()):
+            # 旧版本存的是 ComboBox 序号，转换成显示文本
+            idx = int(raw)
+            text = (self._cb_encode.itemText(idx)
+                    if 0 <= idx < self._cb_encode.count() else '自动检测')
+        elif isinstance(raw, str) and raw:
+            text = raw
+        else:
+            text = '自动检测'
+        # 非法值 findText 返回 -1，回退到默认第 0 项（自动检测）
+        self._cb_encode.setCurrentIndex(max(self._cb_encode.findText(text), 0))
         idx = self._cb_out_code.findText(cfg.out_encoding)
         if idx >= 0:
             self._cb_out_code.setCurrentIndex(idx)

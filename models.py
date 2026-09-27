@@ -58,7 +58,7 @@ class AppConfig:
       QSettings 存储位置由操作系统决定（注册表/plist），
       不利于手动查看和备份。JSON 文件更透明。
     """
-    txt_encoding: int = 0          # TXT→EPUB 时用的文件编码（ComboBox index，0=自动检测）
+    txt_encoding: str = '自动检测'  # TXT→EPUB 时用的文件编码（存下拉显示文本，如 '自动检测'/'gbk'）
     out_encoding: str = 'utf-8'    # EPUB→TXT 时用的输出编码
     chapter_sep: str = ''          # 章节之间的分隔符
     chapter_regex: str = ''        # 匹配章节标题的正则（空=使用 services.DEFAULT_CHAPTER_REGEX）
@@ -99,9 +99,8 @@ class AppConfig:
         # 只保留这些字段，多余的扔掉（安全的配置加载策略）。
         valid_keys = {f.name for f in fields(cls)}
         filtered = {k: v for k, v in data.items() if k in valid_keys}
-        # 兼容旧配置：txt_encoding 从字符串迁移为 int
-        if isinstance(filtered.get('txt_encoding'), str):
-            filtered['txt_encoding'] = 0
+        # 兼容旧版本存的序号（int）：不做类型转换，
+        # 由 window 层 _restore_config 转换成当前下拉的显示文本
         # hex 字符串还原为 bytes
         if isinstance(filtered.get('window_geometry'), str):
             try:
