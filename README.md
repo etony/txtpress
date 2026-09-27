@@ -59,13 +59,14 @@ python -m ruff check .                # 静态检查
 txtpress/
 ├── main.py                      # 程序入口
 ├── main.pyw                     # Windows 无控制台启动
+├── __init__.py                  # 包标识（含模块结构说明）
 ├── window.py                    # 主窗口宿主（Tab 挂载、worker、快捷键、拖放、主题、配置）
 ├── tab_base.py                  # Tab 基类 BaseTab（回调注入）+ 共享控件
 ├── tab_txt2epub.py              # TXT → EPUB 页面
 ├── tab_epub2txt.py              # EPUB → TXT 页面
 ├── tab_mobi2txt.py              # MOBI → TXT 页面
 ├── services.py                  # 核心转换逻辑
-├── models.py                    # 数据模型
+├── models.py                    # 数据模型（BookInfo / AppConfig / ConvertOptions）
 ├── worker.py                    # 后台线程
 ├── utils.py                     # 通用工具（跨平台打开目录）
 ├── dialogs.py                   # 自定义对话框
@@ -77,8 +78,12 @@ txtpress/
 ├── ruff.toml                    # ruff 静态检查配置
 ├── requirements.txt             # Python 依赖
 ├── requirements-dev.txt         # 开发依赖（pytest、ruff）
+├── LICENSE                      # GPL-2.0 许可证
 ├── README.md                    # 本文件
+├── AGENTS.md                    # AI 协作约定
 ├── config.json                  # 用户偏好配置（自动生成）
+├── docs/                        # 设计文档与实施计划
+├── cover.jpeg                   # 根目录副本（与 resources/images/cover.jpeg 重复，遗留待清理）
 ├── resources/
 │   ├── theme.qss                # 浅色主题 QSS 样式表
 │   └── images/
@@ -90,6 +95,7 @@ txtpress/
     ├── minimal.css              # 简约 EPUB 样式
     └── modern.css               # 现代 EPUB 样式
 ```
+
 
 ## 各文件功能与用途
 

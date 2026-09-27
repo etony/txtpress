@@ -1,6 +1,6 @@
 # TxtPress 全量修复（P0–P3）实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 修复代码分析报告中 P0–P3 全部 23 项问题：功能缺陷、线程稳定性、死代码清理、配置语义化，并拆分 `window.py`、补 `services.py` 单元测试、接入 `error_handler`、引入 ruff。
 
@@ -49,7 +49,7 @@
 - Create: `tests/test_txt2epub.py`
 - Create: `requirements-dev.txt`
 
-- [ ] **Step 1: 创建根目录 conftest.py（sys.path + 共享 fixture）**
+- [x] **Step 1: 创建根目录 conftest.py（sys.path + 共享 fixture）**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -122,14 +122,14 @@ def make_epub(tmp_path):
     return _make
 ```
 
-- [ ] **Step 2: 创建 requirements-dev.txt**
+- [x] **Step 2: 创建 requirements-dev.txt**
 
 ```
 pytest
 ruff
 ```
 
-- [ ] **Step 3: 写基础测试 tests/test_txt2epub.py**
+- [x] **Step 3: 写基础测试 tests/test_txt2epub.py**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -154,12 +154,12 @@ def test_convert_creates_epub(sample_txt, tmp_path):
     assert zipfile.ZipFile(out).testzip() is None
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 2 passed（现有代码已满足这两个行为）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "test: add pytest harness and basic Txt2Epub tests"
@@ -175,7 +175,7 @@ git add -A && git commit -m "test: add pytest harness and basic Txt2Epub tests"
 - Create: `tests/test_epub2txt.py`
 - Modify: `services.py`（`Epub2Txt._process_document`）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -200,12 +200,12 @@ def test_sep_variants_differ(make_epub, tmp_path):
     assert '---' in texts[3]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_epub2txt.py -v`
 Expected: FAIL（`len(set(texts)) == 4` 实际为 1）
 
-- [ ] **Step 3: 修复 `_process_document` 分隔符判断**
+- [x] **Step 3: 修复 `_process_document` 分隔符判断**
 
 将 `services.py` 中：
 
@@ -231,12 +231,12 @@ Expected: FAIL（`len(set(texts)) == 4` 实际为 1）
 
 **评审补丁（已执行）:** `_process_document` 为 `convert()`/`convert_chapter()` 共用路径，按章节导出每文件只有一章，"章节间分隔符"不适用。`convert_chapter()` 内暂存 `self.sep` 置空、`try/finally` 恢复，忽略分隔符；`convert()` 行为不变。新增测试 `test_convert_chapter_ignores_sep`。
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed（含既有 2 个）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "fix: apply chapter separator in EPUB to TXT conversion"
@@ -250,7 +250,7 @@ git add -A && git commit -m "fix: apply chapter separator in EPUB to TXT convers
 - Modify: `services.py`（新增 `_text_to_html`；改 `convert()` 序章与正文两处）
 - Modify: `tests/test_txt2epub.py`（追加测试）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
 
 ```python
 def test_html_escaping(tmp_path):
@@ -295,12 +295,12 @@ def test_paragraph_split(tmp_path):
     assert '<p>第二段。</p>' in joined
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_txt2epub.py -v`
 Expected: 两个新测试 FAIL（原文未转义、未分段）
 
-- [ ] **Step 3: services.py 顶部加 `import html`**
+- [x] **Step 3: services.py 顶部加 `import html`**
 
 在 `import os` 之前加：
 
@@ -308,7 +308,7 @@ Expected: 两个新测试 FAIL（原文未转义、未分段）
 import html
 ```
 
-- [ ] **Step 4: 新增 `_text_to_html` 模块函数（放在 CSS_STYLE 定义之后、Txt2Epub 类之前）**
+- [x] **Step 4: 新增 `_text_to_html` 模块函数（放在 CSS_STYLE 定义之后、Txt2Epub 类之前）**
 
 ```python
 def _text_to_html(text: str) -> str:
@@ -326,7 +326,7 @@ def _text_to_html(text: str) -> str:
     )
 ```
 
-- [ ] **Step 5: 改写 convert() 序章块**
+- [x] **Step 5: 改写 convert() 序章块**
 
 将：
 
@@ -367,7 +367,7 @@ def _text_to_html(text: str) -> str:
             book.spine.append(ch)
 ```
 
-- [ ] **Step 6: 改写逐章生成的正文两处**
+- [x] **Step 6: 改写逐章生成的正文两处**
 
 循环开头（原 `body = body.replace('\n', '<br>').replace(chr(160), '')`）改为：
 
@@ -383,12 +383,12 @@ def _text_to_html(text: str) -> str:
             )
 ```
 
-- [ ] **Step 7: 运行确认通过**
+- [x] **Step 7: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add -A && git commit -m "escape HTML and split paragraphs in EPUB output"
@@ -404,7 +404,7 @@ git add -A && git commit -m "escape HTML and split paragraphs in EPUB output"
 - Modify: `services.py`（`Txt2Epub.convert()` 封面/spine/序章/进度四处）
 - Modify: `tests/test_txt2epub.py`（追加 4 个测试）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
 
 ```python
 def test_spine_without_cover(sample_txt, tmp_path):
@@ -448,12 +448,12 @@ def test_progress_completes(sample_txt, tmp_path):
     assert calls[-1][0] == calls[-1][1]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_txt2epub.py -v`
 Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_completes` FAIL；`test_spine_with_cover` PASS
 
-- [ ] **Step 3: 封面注册加 has_cover 标记**
+- [x] **Step 3: 封面注册加 has_cover 标记**
 
 将：
 
@@ -476,7 +476,7 @@ Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_c
                 book.set_cover('cover.jpeg', f.read())
 ```
 
-- [ ] **Step 4: spine 按 has_cover 赋值**
+- [x] **Step 4: spine 按 has_cover 赋值**
 
 将 `book.spine = ['cover']` 一行（及其上方注释行）改为：
 
@@ -485,7 +485,7 @@ Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_c
         book.spine = ['cover'] if has_cover else []
 ```
 
-- [ ] **Step 5: 序章加入 toc 并上报进度**
+- [x] **Step 5: 序章加入 toc 并上报进度**
 
 在 Task 3 改过的序章块中，`book.spine.append(ch)` 之后追加：
 
@@ -496,7 +496,7 @@ Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_c
                 progress(1, total)
 ```
 
-- [ ] **Step 6: 逐章进度计入序章偏移**
+- [x] **Step 6: 逐章进度计入序章偏移**
 
 **（status 分母 `{idx}/{total-1}` → `{idx}/{len(chapters)}` 已在 Task 3 评审修复中提前完成，跳过该部分。）**
 
@@ -521,12 +521,12 @@ Expected: `test_spine_without_cover`、`test_preamble_in_toc`、`test_progress_c
                 progress(done + idx, total)
 ```
 
-- [ ] **Step 7: 运行确认通过**
+- [x] **Step 7: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add -A && git commit -m "fix EPUB spine validity, preamble TOC entry and progress"
@@ -544,7 +544,7 @@ git add -A && git commit -m "fix EPUB spine validity, preamble TOC entry and pro
 - Modify: `window.py`（`_ordered_chapters` 类型与 `_on_preview_chapters`）
 - Create: `tests/test_chapter_order.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -601,12 +601,12 @@ def test_original_order_when_none(tmp_path):
     assert conv.get_chapters() == ['第1章 甲', '第1章 乙']
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_chapter_order.py -v`
 Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PASS（回归保护）
 
-- [ ] **Step 3: dialogs.py — item 存原始索引**
+- [x] **Step 3: dialogs.py — item 存原始索引**
 
 `__init__` 中列表填充循环改为：
 
@@ -620,7 +620,7 @@ Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PAS
             self._list.addItem(item)
 ```
 
-- [ ] **Step 4: dialogs.py — 用 get_ordered_items 替换 get_ordered_chapters**
+- [x] **Step 4: dialogs.py — 用 get_ordered_items 替换 get_ordered_chapters**
 
 将 `get_ordered_chapters` 整个方法替换为：
 
@@ -640,7 +640,7 @@ Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PAS
         ]
 ```
 
-- [ ] **Step 5: services.py — set_chapter_order 新签名**
+- [x] **Step 5: services.py — set_chapter_order 新签名**
 
 将：
 
@@ -669,7 +669,7 @@ Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PAS
         self._chapter_order: Optional[list[tuple[int, str]]] = None  # 自定义章节顺序 [(索引, 新标题)]
 ```
 
-- [ ] **Step 6: services.py — convert() 重排逻辑改为索引**
+- [x] **Step 6: services.py — convert() 重排逻辑改为索引**
 
 将：
 
@@ -710,7 +710,7 @@ Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PAS
                 chapters = reordered
 ```
 
-- [ ] **Step 7: window.py — 状态类型与预览回传**
+- [x] **Step 7: window.py — 状态类型与预览回传**
 
 `__init__` 中类型注释改为：
 
@@ -732,12 +732,12 @@ Expected: `test_rename_by_index` FAIL（重命名被忽略）；其余两个 PAS
                     self._ordered_chapters = None
 ```
 
-- [ ] **Step 8: 运行确认通过**
+- [x] **Step 8: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add -A && git commit -m "order and rename chapters by original index"
@@ -754,7 +754,7 @@ git add -A && git commit -m "order and rename chapters by original index"
 - Modify: `window.py`（`_on_convert_tab1` 启动前校验）
 - Create: `tests/test_regex_validation.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -789,12 +789,12 @@ def test_invalid_regex_syntax(sample_txt):
         conv.get_chapters()
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_regex_validation.py -v`
 Expected: FAIL（`validate_chapter_regex` 不存在 → ImportError/收集失败）
 
-- [ ] **Step 3: services.py 新增 validate_chapter_regex**
+- [x] **Step 3: services.py 新增 validate_chapter_regex**
 
 放在 `_text_to_html` 之后：
 
@@ -823,7 +823,7 @@ def validate_chapter_regex(pattern: str) -> re.Pattern:
     return compiled
 ```
 
-- [ ] **Step 4: `_parse()` 使用校验**
+- [x] **Step 4: `_parse()` 使用校验**
 
 将 `_parse()` 中：
 
@@ -843,7 +843,7 @@ def validate_chapter_regex(pattern: str) -> re.Pattern:
             self._splits = compiled.split(content)
 ```
 
-- [ ] **Step 5: window.py 转换前预校验**
+- [x] **Step 5: window.py 转换前预校验**
 
 `_on_convert_tab1` 中 `conv.set_chapter_order(...)` 之前插入：
 
@@ -865,12 +865,12 @@ from services import (
 )
 ```
 
-- [ ] **Step 6: 运行确认通过**
+- [x] **Step 6: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add -A && git commit -m "validate chapter regex has exactly one capture group"
@@ -884,7 +884,7 @@ git add -A && git commit -m "validate chapter regex has exactly one capture grou
 - Modify: `services.py`（`Epub2Txt.convert()` 与 `convert_chapter()`）
 - Modify: `tests/test_epub2txt.py`（追加 2 个测试）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_epub2txt.py）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_epub2txt.py）**
 
 ```python
 def test_convert_creates_missing_outdir_with_cover(make_epub, tmp_path):
@@ -904,12 +904,12 @@ def test_convert_chapter_outdir_empty(make_epub, tmp_path, monkeypatch):
     assert (tmp_path / 'base1.txt').exists()
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_epub2txt.py -v`
 Expected: `test_convert_creates_missing_outdir_with_cover` FAIL（FileNotFoundError）
 
-- [ ] **Step 3: convert() 调整顺序**
+- [x] **Step 3: convert() 调整顺序**
 
 将：
 
@@ -939,7 +939,7 @@ Expected: `test_convert_creates_missing_outdir_with_cover` FAIL（FileNotFoundEr
         total = len(docs)
 ```
 
-- [ ] **Step 4: convert_chapter() 加空目录保护**
+- [x] **Step 4: convert_chapter() 加空目录保护**
 
 将：
 
@@ -961,12 +961,12 @@ Expected: `test_convert_creates_missing_outdir_with_cover` FAIL（FileNotFoundEr
         self._save_cover_if_exists()
 ```
 
-- [ ] **Step 5: 运行确认通过**
+- [x] **Step 5: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "create output directory before saving cover"
@@ -983,7 +983,7 @@ git add -A && git commit -m "create output directory before saving cover"
 - Modify: `window.py`（`_on_convert_tab1` 替换两段 replace）
 - Modify: `tests/test_txt2epub.py`（追加测试）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_txt2epub.py）**
 
 ```python
 def test_apply_text_style(sample_txt, tmp_path):
@@ -1010,12 +1010,12 @@ def test_apply_text_style_on_minimal_css(sample_txt, tmp_path):
 
 （`os` 已在文件顶部 import。）
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_txt2epub.py -v`
 Expected: 两个新测试 FAIL（方法不存在 → AttributeError）
 
-- [ ] **Step 3: services.py 新增 apply_text_style**
+- [x] **Step 3: services.py 新增 apply_text_style**
 
 在 `Txt2Epub.load_css_from_file` 方法之后添加：
 
@@ -1042,7 +1042,7 @@ Expected: 两个新测试 FAIL（方法不存在 → AttributeError）
             )
 ```
 
-- [ ] **Step 4: window.py 替换两段 replace**
+- [x] **Step 4: window.py 替换两段 replace**
 
 将 `_on_convert_tab1` 中从注释 `# 应用字体设置` 开始、到目录样式 replace 结束的整段（即下面这段旧代码）：
 
@@ -1076,12 +1076,12 @@ Expected: 两个新测试 FAIL（方法不存在 → AttributeError）
         )
 ```
 
-- [ ] **Step 5: 运行确认通过**
+- [x] **Step 5: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "override font and toc styles via appended CSS rules"
@@ -1096,13 +1096,13 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
 **Files:**
 - Modify: `window.py`（`__init__`、`_load_txt_file`、`_on_convert_tab1`、`_on_preview_chapters`、`_on_reset_tab1`）
 
-- [ ] **Step 1: `__init__` 状态变量区（`self._cc_t2s = None` 行之后）新增**
+- [x] **Step 1: `__init__` 状态变量区（`self._cc_t2s = None` 行之后）新增**
 
 ```python
         self._detected_encoding = 'utf-8'          # chardet 检测到的输入编码
 ```
 
-- [ ] **Step 2: `_load_txt_file` 保存检测结果**
+- [x] **Step 2: `_load_txt_file` 保存检测结果**
 
 将：
 
@@ -1129,7 +1129,7 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
             logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
 ```
 
-- [ ] **Step 3: 新增统一取编码的方法（放在 `_load_txt_file` 之后）**
+- [x] **Step 3: 新增统一取编码的方法（放在 `_load_txt_file` 之后）**
 
 ```python
     def _current_txt_encoding(self) -> str:
@@ -1143,7 +1143,7 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
         return self._cb_encode.currentText()
 ```
 
-- [ ] **Step 4: `_on_convert_tab1` 使用该方法**
+- [x] **Step 4: `_on_convert_tab1` 使用该方法**
 
 将：
 
@@ -1158,7 +1158,7 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
         conv.encoding = self._current_txt_encoding()
 ```
 
-- [ ] **Step 5: `_on_preview_chapters` 同样使用**
+- [x] **Step 5: `_on_preview_chapters` 同样使用**
 
 将：
 
@@ -1173,7 +1173,7 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
             conv.encoding = self._current_txt_encoding()
 ```
 
-- [ ] **Step 6: `_on_reset_tab1` 重置检测值**
+- [x] **Step 6: `_on_reset_tab1` 重置检测值**
 
 在 `self._cb_encode.setCurrentIndex(0)` 之后加：
 
@@ -1181,12 +1181,12 @@ git add -A && git commit -m "override font and toc styles via appended CSS rules
         self._detected_encoding = 'utf-8'
 ```
 
-- [ ] **Step 7: 验证（手动）**
+- [x] **Step 7: 验证（手动）**
 
 Run: `python main.py`
 Expected: 选择一个 GBK 编码的 TXT，状态栏显示"编码: GBK"，下拉保持"自动检测"，生成的 EPUB 中文正常不乱码。
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add -A && git commit -m "use detected encoding for auto-detect mode"
@@ -1201,7 +1201,7 @@ git add -A && git commit -m "use detected encoding for auto-detect mode"
 **Files:**
 - Modify: `window.py`（`_run_worker`、新增 `_is_busy`、三个快捷键、`closeEvent`）
 
-- [ ] **Step 1: 新增 `_is_busy`（放在 `_run_worker` 方法之前）**
+- [x] **Step 1: 新增 `_is_busy`（放在 `_run_worker` 方法之前）**
 
 ```python
     def _is_busy(self) -> bool:
@@ -1209,7 +1209,7 @@ git add -A && git commit -m "use detected encoding for auto-detect mode"
         return self._worker is not None and self._worker.isRunning()
 ```
 
-- [ ] **Step 2: `_run_worker` 入口加重入保护**
+- [x] **Step 2: `_run_worker` 入口加重入保护**
 
 在 `_run_worker` 函数体最开头（`def _progress` 闭包定义之前）加：
 
@@ -1220,7 +1220,7 @@ git add -A && git commit -m "use detected encoding for auto-detect mode"
             return
 ```
 
-- [ ] **Step 3: 三个快捷键处理器加保护**
+- [x] **Step 3: 三个快捷键处理器加保护**
 
 `_on_shortcut_convert` 开头加：
 
@@ -1237,7 +1237,7 @@ git add -A && git commit -m "use detected encoding for auto-detect mode"
             return
 ```
 
-- [ ] **Step 4: closeEvent 取消并等待**
+- [x] **Step 4: closeEvent 取消并等待**
 
 将：
 
@@ -1270,12 +1270,12 @@ git add -A && git commit -m "use detected encoding for auto-detect mode"
         super().closeEvent(event)
 ```
 
-- [ ] **Step 5: 验证**
+- [x] **Step 5: 验证**
 
 Run: `python -m pytest tests/ -v`（回归）
 Run: `python main.py`（手动：转换中反复按 Ctrl+Enter 只弹一次状态提示；转换中关窗口程序正常退出）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "guard against reentrant worker launches and cancel on close"
@@ -1291,7 +1291,7 @@ git add -A && git commit -m "guard against reentrant worker launches and cancel 
 - Modify: `worker.py`（信号改名 `task_done`，三态结果）
 - Modify: `window.py`（`_run_worker` 连接与 `_done` 分支）
 
-- [ ] **Step 1: worker.py 信号定义改为**
+- [x] **Step 1: worker.py 信号定义改为**
 
 ```python
     # 定义信号。pyqtSignal 在类级别定义，PyQt 元类自动处理。
@@ -1301,7 +1301,7 @@ git add -A && git commit -m "guard against reentrant worker launches and cancel 
     task_done = pyqtSignal(bool, str, bool)  # (成功, 错误消息, 是否被取消)
 ```
 
-- [ ] **Step 2: run() 三个 emit 改为**
+- [x] **Step 2: run() 三个 emit 改为**
 
 成功分支：
 
@@ -1328,7 +1328,7 @@ git add -A && git commit -m "guard against reentrant worker launches and cancel 
             self.task_done.emit(False, str(e), False)
 ```
 
-- [ ] **Step 3: 更新 worker.py 文档**
+- [x] **Step 3: 更新 worker.py 文档**
 
 模块 docstring 用法示例中 `worker.finished.connect(on_done)` 改为：
 
@@ -1344,7 +1344,7 @@ git add -A && git commit -m "guard against reentrant worker launches and cancel 
 
 类 docstring 中 "worker 通过信号通知 UI：进度更新、状态更新、任务完成" 段落里的 finished 描述同步改为 task_done。
 
-- [ ] **Step 4: window.py `_done` 改为三态**
+- [x] **Step 4: window.py `_done` 改为三态**
 
 将 `_run_worker` 中的 `_done` 替换为：
 
@@ -1374,12 +1374,12 @@ git add -A && git commit -m "guard against reentrant worker launches and cancel 
         self._worker.task_done.connect(_done)
 ```
 
-- [ ] **Step 5: 验证**
+- [x] **Step 5: 验证**
 
 Run: `python -m pytest tests/ -v`
 Run: `python main.py`（手动：转换中点"取消"→ 状态栏显示"已取消"，不弹"完成"窗口）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "distinguish cancelled results and rename finished signal"
@@ -1394,7 +1394,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
 **Files:**
 - Modify: `window.py`（`_run_worker` + 5 个调用点）
 
-- [ ] **Step 1: `_run_worker` 扩展签名与逻辑**
+- [x] **Step 1: `_run_worker` 扩展签名与逻辑**
 
 新签名：
 
@@ -1449,7 +1449,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
 
 `_progress` 闭包不变（元数据任务不发 progress，进度条自然不显示）。
 
-- [ ] **Step 2: `_run_epub_to_txt` — UI 预采集 + worker 内建 reader**
+- [x] **Step 2: `_run_epub_to_txt` — UI 预采集 + worker 内建 reader**
 
 将（从 `reader = Epub2Txt(epub_path, txt_path)` 到该方法末尾的 `self._run_worker(...)`）：
 
@@ -1497,7 +1497,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
         )
 ```
 
-- [ ] **Step 3: `_load_epub_file` 改为 worker 读取 + on_success 回填**
+- [x] **Step 3: `_load_epub_file` 改为 worker 读取 + on_success 回填**
 
 将整个 `_load_epub_file` 方法替换为：
 
@@ -1553,7 +1553,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
                          fail_msg='读取失败', show_progress=False)
 ```
 
-- [ ] **Step 4: `_on_save_metadata` 改为 worker 写回**
+- [x] **Step 4: `_on_save_metadata` 改为 worker 写回**
 
 将方法体中（EPUB 存在性校验之后的）`try:` 整块替换为：
 
@@ -1585,7 +1585,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
                          fail_msg='保存失败', show_progress=False)
 ```
 
-- [ ] **Step 5: `_on_extract_images` 改为 worker 提取**
+- [x] **Step 5: `_on_extract_images` 改为 worker 提取**
 
 方法体（EPUB 存在性校验、`out_dir` 计算之后）替换为：
 
@@ -1616,7 +1616,7 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
                          fail_msg='提取失败', show_progress=False)
 ```
 
-- [ ] **Step 6: `_load_mobi_metadata` 改为 worker 读取**
+- [x] **Step 6: `_load_mobi_metadata` 改为 worker 读取**
 
 将整个方法替换为：
 
@@ -1664,12 +1664,12 @@ git add -A && git commit -m "distinguish cancelled results and rename finished s
                          fail_msg='读取 MOBI 失败', show_progress=False)
 ```
 
-- [ ] **Step 7: 验证**
+- [x] **Step 7: 验证**
 
 Run: `python -m pytest tests/ -v`（回归）
 Run: `python main.py`（手动：浏览大 EPUB 时界面不再冻结；三个 Tab 各转换一次成功；MOBI 加载失败时弹"读取 MOBI 失败: …"）
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add -A && git commit -m "move EPUB and MOBI file IO off the main thread"
@@ -1685,7 +1685,7 @@ git add -A && git commit -m "move EPUB and MOBI file IO off the main thread"
 - Modify: `services.py`（6 处）
 - Create: `tests/test_services_hardening.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -1727,12 +1727,12 @@ def test_modi_writes_atomically(make_epub, tmp_path):
     assert not os.path.exists(target + '.tmp')
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `python -m pytest tests/test_services_hardening.py -v`
 Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeError）；其余两个 PASS（回归保护）
 
-- [ ] **Step 3: 容错解码**
+- [x] **Step 3: 容错解码**
 
 将：
 
@@ -1751,7 +1751,7 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
         )
 ```
 
-- [ ] **Step 4: extract_images 同名去重**
+- [x] **Step 4: extract_images 同名去重**
 
 将：
 
@@ -1792,7 +1792,7 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
         return extracted
 ```
 
-- [ ] **Step 5: `_save_cover_if_exists` 的 id None 保护**
+- [x] **Step 5: `_save_cover_if_exists` 的 id None 保护**
 
 将：
 
@@ -1809,7 +1809,7 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
             )
 ```
 
-- [ ] **Step 6: MOBI html/htm 混合排序**
+- [x] **Step 6: MOBI html/htm 混合排序**
 
 将：
 
@@ -1837,7 +1837,7 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
 > 注意 `re.split(r'(\d+)', ...)` 的捕获组使列表恒为 str/num 交替，同位置类型可比，无 TypeError。
 
 
-- [ ] **Step 7: extract_mobi_metadata 失败时抛错（不再静默空字段）**
+- [x] **Step 7: extract_mobi_metadata 失败时抛错（不再静默空字段）**
 
 将：
 
@@ -1859,7 +1859,7 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
     return metadata
 ```
 
-- [ ] **Step 8: modi() 原子写回**
+- [x] **Step 8: modi() 原子写回**
 
 将：
 
@@ -1887,12 +1887,12 @@ Expected: `test_process_document_tolerates_invalid_utf8` FAIL（UnicodeDecodeErr
             raise
 ```
 
-- [ ] **Step 9: 运行确认通过**
+- [x] **Step 9: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 10: 提交**
+- [x] **Step 10: 提交**
 
 ```bash
 git add -A && git commit -m "harden services: tolerant decode, image dedupe, atomic modi"
@@ -1905,7 +1905,7 @@ git add -A && git commit -m "harden services: tolerant decode, image dedupe, ato
 **Files:**
 - Modify: `window.py`（import；`_run_worker` 加 `error_code`；`_done` 失败分支；`_on_preview_chapters`；各调用点补错误码）
 
-- [ ] **Step 1: import**
+- [x] **Step 1: import**
 
 `window.py` 头部 import 区新增：
 
@@ -1913,7 +1913,7 @@ git add -A && git commit -m "harden services: tolerant decode, image dedupe, ato
 from error_handler import show_error
 ```
 
-- [ ] **Step 2: `_run_worker` 签名加 error_code**
+- [x] **Step 2: `_run_worker` 签名加 error_code**
 
 ```python
     def _run_worker(self, target, success_msg: str = '', dir_to_open: str = '',
@@ -1928,7 +1928,7 @@ docstring 的 Args 加一行：
             error_code: error_handler.ERROR_MESSAGES 中的错误码
 ```
 
-- [ ] **Step 3: `_done` 失败分支换用 show_error**
+- [x] **Step 3: `_done` 失败分支换用 show_error**
 
 将：
 
@@ -1946,7 +1946,7 @@ docstring 的 Args 加一行：
                 self.statusBar().showMessage(fail_msg)
 ```
 
-- [ ] **Step 4: 各调用点补错误码**
+- [x] **Step 4: 各调用点补错误码**
 
 - `_load_epub_file`：`self._run_worker(...)` 调用加 `error_code='epub_read_failed'`
 - `_on_save_metadata`：加 `error_code='epub_write_failed'`
@@ -1954,7 +1954,7 @@ docstring 的 Args 加一行：
 - `_load_mobi_metadata`：加 `error_code='mobi_read_failed'`
 - 其余转换调用点（tab1/tab2/tab3 转换）用默认 `'conversion_failed'`，不改
 
-- [ ] **Step 5: `_on_preview_chapters` 异常分支换用 show_error**
+- [x] **Step 5: `_on_preview_chapters` 异常分支换用 show_error**
 
 将：
 
@@ -1975,13 +1975,13 @@ docstring 的 Args 加一行：
             logger.exception('目录预览失败')
 ```
 
-- [ ] **Step 6: 验证**
+- [x] **Step 6: 验证**
 
 Run: `python -m pytest tests/ -v`
 Run: `python -c "import window"`（import 正常）
 Run: `python main.py`（手动：构造一个错误触发弹窗，文案为 error_handler 友好提示 + 详细信息）
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add -A && git commit -m "use error_handler friendly messages for error dialogs"
@@ -1995,7 +1995,7 @@ git add -A && git commit -m "use error_handler friendly messages for error dialo
 - Modify: `theme_manager.py`（删 `get_theme_icon`）
 - Modify: `window.py`（合并重复 `Theme` 导入；`_run_epub_to_txt` 样式选择改用 STYLES_DIR）
 
-- [ ] **Step 1: constants.py 新增**
+- [x] **Step 1: constants.py 新增**
 
 ```python
 # ---------------------------------------------------------------------------
@@ -2011,7 +2011,7 @@ STYLES_DIR = os.path.join(BASE_DIR, 'styles')
 
 （`os` 已 import。）
 
-- [ ] **Step 2: services.py CSS_STYLE 从文件读取 + 删除重复 import**
+- [x] **Step 2: services.py CSS_STYLE 从文件读取 + 删除重复 import**
 
 将文件头部 `import shutil` 的重复行删除（只保留一处）。将模块级：
 
@@ -2035,11 +2035,11 @@ CSS_STYLE = _load_default_css()
 
 注意：`services.py` 目前是否 import constants 需先查看；若未 import，可直接用 `os.path.dirname(__file__)` 方案（如上），避免改动其它引用。**修改前先 `read services.py` 确认 CSS_STYLE 无其它字面量引用（grep `CSS_STYLE`）。**
 
-- [ ] **Step 3: theme_manager.py 删除未使用的 get_theme_icon**
+- [x] **Step 3: theme_manager.py 删除未使用的 get_theme_icon**
 
 grep 确认 `get_theme_icon` 全库无调用后，删除该方法及其上方注释。
 
-- [ ] **Step 4: window.py 合并重复 Theme 导入**
+- [x] **Step 4: window.py 合并重复 Theme 导入**
 
 grep `from theme_manager import` 确认重复行后，合并为一行：
 
@@ -2049,13 +2049,13 @@ from theme_manager import theme_manager, Theme
 
 （以实际内容为准，保留被使用的符号。）
 
-- [ ] **Step 5: 运行验证**
+- [x] **Step 5: 运行验证**
 
 Run: `python -m pytest tests/ -v`
 Run: `python -c "import services, window, theme_manager"`
 Run: `python main.py`（确认默认样式与主题切换正常）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "remove dead code and consolidate duplicated constants"
@@ -2072,7 +2072,7 @@ git add -A && git commit -m "remove dead code and consolidate duplicated constan
 - Modify: `theme_manager.py`（DARK_THEME 2 处 + 补拖放样式）
 - Modify: `window.py`（确认 `_cover_label`/`lblCover` 等 objectName 设置正确）
 
-- [ ] **Step 1: grep 现状**
+- [x] **Step 1: grep 现状**
 
 ```
 grep -n "cover_label" resources/theme.qss theme_manager.py window.py
@@ -2082,11 +2082,11 @@ grep -n "setObjectName" window.py | grep -i cover
 
 按实际结果对齐：选择器与 objectName 必须一致（`#cover_label` 匹配 `setObjectName("cover_label")`）。**先读再改，不猜。**
 
-- [ ] **Step 2: 修正选择器**
+- [x] **Step 2: 修正选择器**
 
 `resources/theme.qss` 两处、`theme_manager.py` DARK_THEME 两处：`QLabel#cover_label` → `#cover_label`（或对齐实际 objectName）。
 
-- [ ] **Step 3: DARK_THEME 补拖放高亮**
+- [x] **Step 3: DARK_THEME 补拖放高亮**
 
 DARK_THEME 字符串中追加：
 
@@ -2096,11 +2096,11 @@ QMainWindow[dragging="true"] { background:#1E3A5F; border:2px dashed #4A9EFF; }
 
 确认 `window.py` 拖放逻辑确实 setProperty("dragging", ...)（grep `dragging`）；若属性名不同，用实际属性名。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `python main.py`（深/浅主题切换，封面占位样式与拖放高亮可见）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "fix cover label QSS selectors and dark theme drag highlight"
@@ -2113,24 +2113,24 @@ git add -A && git commit -m "fix cover label QSS selectors and dark theme drag h
 **Files:**
 - Modify: `window.py`
 
-- [ ] **Step 1: grep 检查 `_reset_*` 方法字段覆盖**
+- [x] **Step 1: grep 检查 `_reset_*` 方法字段覆盖**
 
 `grep -n "_reset" window.py`，对照各 Tab 的输入控件清单，找出 reset 时遗漏的控件（如 EPUB 页的元数据输入框、MOBI 页字段、输出编码下拉等）。每个遗漏控件补一行重置代码。
 
-- [ ] **Step 2: 输出路径保护**
+- [x] **Step 2: 输出路径保护**
 
 `_on_convert_tab1` 中：目标文件已存在时（且非临时测试场景），QMessageBox 覆盖确认；输出路径为空/目录不存在时报错返回。同理检查 tab2/tab3 的输出路径校验。**先读三个 convert 方法再改。**
 
-- [ ] **Step 3: Yes-No 按钮**
+- [x] **Step 3: Yes-No 按钮**
 
 grep `QMessageBox.question` 与 `QMessageBox.StandardButton.Yes`：确认所有确认弹窗用 `Yes | No`（而非默认 OK/Cancel 语义错配）。特别注意 `_ask_open_dir` 与 `_on_extract_images`。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `python -m pytest tests/ -v`
 Run: `python main.py`（手动走 reset / 覆盖确认路径）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "complete field resets, protect output paths, fix dialog buttons"
@@ -2146,7 +2146,7 @@ git add -A && git commit -m "complete field resets, protect output paths, fix di
 - Modify: `models.py`（`txt_encoding: str = '自动检测'`；load 兼容旧 int）
 - Modify: `window.py`（`_save_config` 存 currentText；`_restore_config` 兼容 int）
 
-- [ ] **Step 1: models.py**
+- [x] **Step 1: models.py**
 
 `txt_encoding` 默认值改 `str = '自动检测'`；`AppConfig.load()` 中删除 `str(int(x)) → int` 的旧迁移逻辑（grep `txt_encoding` 确认），改为：
 
@@ -2156,13 +2156,13 @@ git add -A && git commit -m "complete field resets, protect output paths, fix di
 
 （若 load 中有 `txt_encoding = str(...)` 保留字符串化即可。）
 
-- [ ] **Step 2: window.py `_save_config`**
+- [x] **Step 2: window.py `_save_config`**
 
 ```python
 cfg.txt_encoding = self._cb_encode.currentText()
 ```
 
-- [ ] **Step 3: window.py `_restore_config` 兼容旧序号**
+- [x] **Step 3: window.py `_restore_config` 兼容旧序号**
 
 ```python
 raw = cfg.txt_encoding
@@ -2175,12 +2175,12 @@ else:
 self._cb_encode.setCurrentIndex(max(self._cb_encode.findText(text), 0))
 ```
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `python -m pytest tests/ -v`
 Run: `python main.py`（改编码 → 重启 → 编码仍是所选项；用旧 config.json 启动一次确认兼容）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "store semantic encoding value instead of combo index"
@@ -2201,7 +2201,7 @@ git add -A && git commit -m "store semantic encoding value instead of combo inde
 3. **先跑通再删**：先新建文件并让 window.py import 它们、行为完全一致（测试全绿 + 手动冒烟），确认无回归后才从 window.py 删除原代码。
 4. 迁移顺序：utils → tab_base → 三个 Tab（逐个迁，每迁一个跑一次测试 + 提交）。
 
-- [ ] **Step 1: 先建 utils.py（零风险迁移）**
+- [x] **Step 1: 先建 utils.py（零风险迁移）**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -2233,7 +2233,7 @@ def open_dir(path: str) -> bool:
 
 （`open_dir` 的现有实现从 window.py 原样迁移，以实际代码为准。）
 
-- [ ] **Step 2: 建 tab_base.py**
+- [x] **Step 2: 建 tab_base.py**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -2354,7 +2354,7 @@ def _status(text: str) -> str:
 
 **注意：** `_create_file_row`/`_create_book_info_group`/`_status` 必须以 `window.py` 中现成实现为准原样迁移（先读 window.py 对应方法），上面只是签名示意。若现有布局代码与控件状态强耦合、无法干净迁出，允许保留私有辅助在各自 Tab 内 —— 以"行为不变"为最高约束。
 
-- [ ] **Step 3: 迁移 TabTxt2Epup（示例流程，其余两个 Tab 同法）**
+- [x] **Step 3: 迁移 TabTxt2Epup（示例流程，其余两个 Tab 同法）**
 
 1. 从 `window.py` 把 `_create_tab_txt2epub`（或等价构建方法）+ 相关私有方法（`_on_convert_tab1`、`_on_reset_tab1`、`_on_choose_cover`、`_load_txt_file` 等）剪切到 `tab_txt2epub.py` 的 `class TabTxt2Epub(BaseTab)`。
 2. 控件成员从 `self._le_txt_path`（MainWindow）变成 Tab 自己的 `self._le_txt_path`。
@@ -2365,22 +2365,22 @@ def _status(text: str) -> str:
 7. Run: `python -m pytest tests/ -v` + `python main.py` 手动冒烟（三 Tab 转换、拖放、快捷键、封面选择、重置）。
 8. Commit: `git add -A && git commit -m "extract TabTxt2Epub into its own module"`
 
-- [ ] **Step 4: 迁移 TabEpub2Txt（同 Step 3 流程）**
+- [x] **Step 4: 迁移 TabEpub2Txt（同 Step 3 流程）**
 
 Commit: `git add -A && git commit -m "extract TabEpub2Txt into its own module"`
 
-- [ ] **Step 5: 迁移 TabMobi2Txt（同 Step 3 流程）**
+- [x] **Step 5: 迁移 TabMobi2Txt（同 Step 3 流程）**
 
 Commit: `git add -A && git commit -m "extract TabMobi2Txt into its own module"`
 
-- [ ] **Step 6: window.py 收尾**
+- [x] **Step 6: window.py 收尾**
 
 - 删除已迁出的私有方法，MainWindow 只留：`_init_ui`（组装三 Tab）、worker 相关（`_run_worker`/`_is_busy`/`_progress`/`_status`/`_cancel`/`_done`/`_ask_open_dir`）、快捷键、拖放、主题、配置、`closeEvent`。
 - grep `window.py` 确认无残留对已删方法的引用。
 - Run: `python -m pytest tests/ -v`；`python -c "import window"`；手动全功能冒烟。
 - 行数预期：`window.py` 降到 ~900 行以内（记录 `wc -l window.py tab_*.py` 到提交信息）。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add -A && git commit -m "slim down window.py after tab extraction"
@@ -2398,7 +2398,7 @@ git add -A && git commit -m "slim down window.py after tab extraction"
 - Modify: `window.py`（构造 dataclass + `configure()`）
 - Create: `tests/test_convert_options.py`
 
-- [ ] **Step 1: models.py 新增**
+- [x] **Step 1: models.py 新增**
 
 ```python
 from dataclasses import dataclass, field, asdict
@@ -2423,7 +2423,7 @@ class ConvertOptions:
     chapter_order: list | None = None
 ```
 
-- [ ] **Step 2: services.py 新增 configure**
+- [x] **Step 2: services.py 新增 configure**
 
 ```python
     def configure(self, opts) -> None:
@@ -2446,7 +2446,7 @@ class ConvertOptions:
 
 （`from dataclasses import asdict` 加入 services.py import；注意映射 `opts.text_path → self.text_path` 等字段名必须与 Txt2Epub.__init__ 实际属性一一对应 —— **先读 __init__ 确认字段名**，不一致的用显式映射 dict `{...}` 替代 asdict 直写。）
 
-- [ ] **Step 3: 写测试**
+- [x] **Step 3: 写测试**
 
 ```python
 # -*- coding: utf-8 -*-
@@ -2480,15 +2480,15 @@ def test_configure_unknown_field_raises(sample_txt):
 
 （第三个测试按 configure 实际实现调整触发方式，核心是"未知字段要响亮报错"。）
 
-- [ ] **Step 4: window.py `_on_convert_tab1` 改用 configure**
+- [x] **Step 4: window.py `_on_convert_tab1` 改用 configure**
 
 把逐行 `conv.title = ...` 赋值替换为构造 `ConvertOptions(...)` + `conv.configure(opts)`；`conv.set_chapter_order(...)` 若已并入 opts.chapter_order 则删除单独调用（否则保留）。
 
-- [ ] **Step 5: 运行确认通过**
+- [x] **Step 5: 运行确认通过**
 
 Run: `python -m pytest tests/ -v`
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A && git commit -m "add ConvertOptions for Txt2Epub configuration"
@@ -2500,7 +2500,7 @@ git add -A && git commit -m "add ConvertOptions for Txt2Epub configuration"
 - Create: `ruff.toml`
 - Modify: 需要的源文件（只修真实问题，不为凑数改代码）
 
-- [ ] **Step 1: 创建 ruff.toml**
+- [x] **Step 1: 创建 ruff.toml**
 
 ```toml
 # 保守配置：只开 pycodestyle 错误级 + pyflakes，
@@ -2516,24 +2516,24 @@ ignore = []
 "tests/*" = ["E402"]
 ```
 
-- [ ] **Step 2: 首次运行并记录**
+- [x] **Step 2: 首次运行并记录**
 
 Run: `python -m ruff check .`
 Expected: 输出未使用 import（F401）、未使用变量（F841）等真实问题清单。
 
-- [ ] **Step 3: 逐个修复（或确认误报后加行内 noqa）**
+- [x] **Step 3: 逐个修复（或确认误报后加行内 noqa）**
 
 原则：
 - 未使用 import → 删（确认无副作用）。
 - 未使用变量 → 删或改 `_` 占位。
 - 不为过 lint 引入行为变更；拿不准的保留代码加 `# noqa: Fxxx` 并在提交信息注明。
 
-- [ ] **Step 4: 清零确认**
+- [x] **Step 4: 清零确认**
 
 Run: `python -m ruff check .` → `All checks passed!`
 Run: `python -m pytest tests/ -v` → 全绿
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A && git commit -m "add ruff config and fix lint findings"
@@ -2548,7 +2548,7 @@ git add -A && git commit -m "add ruff config and fix lint findings"
 - Modify: `README.md`（如有"无测试"表述）
 - Modify: `requirements.txt`（如需运行时依赖确认；dev 依赖已在 requirements-dev.txt）
 
-- [ ] **Step 1: AGENTS.md 更新**
+- [x] **Step 1: AGENTS.md 更新**
 
 - 项目结构表：新增 `tab_base.py` / `tab_txt2epub.py` / `tab_epub2txt.py` / `tab_mobi2txt.py` / `utils.py` / `tests/` / `ruff.toml` / `requirements-dev.txt` 行。
 - 删除"无测试、无 linting"注意事项，改为：
@@ -2565,11 +2565,11 @@ pip install -r requirements-dev.txt   # 开发依赖
 
 - 架构要点补一行："Tab 子类通过 `BaseTab(run_worker, is_busy, save_config)` 注入 MainWindow 能力，不反向 import window"。
 
-- [ ] **Step 2: README.md 同步**
+- [x] **Step 2: README.md 同步**
 
 grep `无测试|无 lint|无 CI`，按实际表述修正；补"开发"小节（pytest/ruff）。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add -A && git commit -m "update docs for new module layout and tooling"
@@ -2579,22 +2579,22 @@ git add -A && git commit -m "update docs for new module layout and tooling"
 
 ### Task 23: 全量验证
 
-- [ ] **Step 1: 单元测试**
+- [x] **Step 1: 单元测试**
 
 Run: `python -m pytest tests/ -v`
 Expected: 全部 passed
 
-- [ ] **Step 2: 静态检查**
+- [x] **Step 2: 静态检查**
 
 Run: `python -m ruff check .`
 Expected: `All checks passed!`
 
-- [ ] **Step 3: import 完整性**
+- [x] **Step 3: import 完整性**
 
 Run: `python -c "import window, services, worker, models, dialogs, constants, error_handler, theme_manager, utils, tab_base, tab_txt2epub, tab_epub2txt, tab_mobi2txt"`
 Expected: 无异常
 
-- [ ] **Step 4: 手动冒烟清单（python main.py）**
+- [x] **Step 4: 手动冒烟清单（python main.py）**
 
 | # | 操作 | 预期 |
 |---|------|------|
@@ -2611,7 +2611,7 @@ Expected: 无异常
 | 11 | 改配置（编码/主题）→ 重启 | 配置保持 |
 | 12 | 深/浅主题切换 + 拖放文件 | 封面样式/拖放高亮正常 |
 
-- [ ] **Step 5: 提交收尾**
+- [x] **Step 5: 提交收尾**
 
 ```bash
 git add -A && git commit -m "chore: final verification pass"
@@ -2665,4 +2665,22 @@ git log --oneline               # 每任务一条英文提交
 - Task 23 手动冒烟 12 项全部通过。
 - `window.py` 显著瘦身（<900 行），新增 5 个模块可独立 import。
 - AGENTS.md / README 与实际结构一致。
+
+## 执行结果记录（2026-09-27）
+
+- **23 个任务全部完成**（勾选框已回填）；Task 23 全量验证 `PASS_WITH_NOTES`：
+  pytest 128 用例连跑两遍全绿、ruff `All checks passed`、28 个 py 文件编译通过、
+  13 模块跨 cwd import 正常、配置隔离冒烟通过（真实 `config.json` 首尾 SHA256 一致）。
+- **待人工确认**：DoD 中"手动冒烟 12 项"为 GUI 交互项，本轮仅 6-8/11/12 有自动化覆盖，
+  #1-#5/#9/#10 需人工启动 `python main.py` 确认。
+- **执行中累积的遗留**（计划原表 3 项之外）：
+  1. `services.py` `language='cn'` 非法 BCP47（应为 `zh`/`zh-CN`）——Task 20 评审记录；
+  2. `window.py` `on_success` 保护分支弹窗未走 `show_error`（与失败分支风格不一致）——Task 14 评审记录；
+  3. error_handler 未知错误码兜底只显示"未知错误"，`fail_msg` 仅在状态栏——Task 14 评审记录；
+  4. `_parse_key` 章节指纹不含文件 mtime，同路径原地覆盖文件不触发目录失效——Task 5/9 评审记录；
+  5. 根目录 `cover.jpeg` 与 `resources/images/cover.jpeg` 内容重复（首提交遗留），README 已标注待清理。
+- **执行事故记录**：Task 19 的 offscreen 冒烟脚本未隔离 `CONFIG_PATH`，覆写了真实
+  `config.json`（原值不可恢复，当前为合法默认配置）。后续任何 offscreen 建窗
+  （含冒烟脚本）必须 monkeypatch `window.CONFIG_PATH` 到临时路径。
+
 
