@@ -47,7 +47,11 @@ class BookInfo:
 
 @dataclass
 class ConvertOptions:
-    """Txt2Epub.convert() 的参数集合。字段名与 dataclass 对齐。"""
+    """Txt2Epub.convert() 的参数集合。字段名与 dataclass 对齐。
+
+    publisher/separator/fanjian 为预留字段，当前 Txt2Epub 无对应属性，
+    传非空值将在 configure() 中抛 AttributeError。
+    """
     text_path: str = ''
     out_path: str = ''
     title: str = ''

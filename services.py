@@ -38,7 +38,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 from opencc import OpenCC
 
-from models import BookInfo
+from models import BookInfo, ConvertOptions
 from constants import (
     DEFAULT_COVER, DEFAULT_AUTHOR, DEFAULT_DESC, DEFAULT_ID,
     DEFAULT_CHAPTER_REGEX, STYLES_DIR,
@@ -180,18 +180,22 @@ class Txt2Epub:
         self._cached_regex: str = ''                              # 上次解析时的正则（用于缓存失效）
         self._chapter_order: Optional[list[tuple[int, str]]] = None   # 自定义章节顺序 [(原始索引, 新标题)]
 
-    def configure(self, opts) -> None:
+    def configure(self, opts: ConvertOptions) -> None:
         """按 ConvertOptions 批量设置属性。
 
         空字符串/None/False 视为"未指定"，跳过不覆盖现有值；
-        chapter_order 为 None 同样跳过（保持当前顺序）。
+        字段的非空默认值（language='cn'、encoding='utf-8'）总是生效，
+        falsy skip 只跳过空/None/False。
+        chapter_order 为 None 同样跳过（保持当前顺序），因此
+        configure 不能清空已设置的顺序。
         未知字段（Txt2Epub 无对应属性）抛 AttributeError，
         避免拼写错误被静默吞掉。
+        ConvertOptions 未覆盖的属性（contributor/date 等）仍可直接赋值。
         """
         for key, value in asdict(opts).items():
             if key == 'chapter_order':
                 if value is not None:
-                    self._chapter_order = value
+                    self.set_chapter_order(value)
                 continue
             if not value:  # ''/None/False 均视为未指定
                 continue
