@@ -9,6 +9,8 @@ python main.pyw     # Windows 无控制台启动
 
 无构建步骤，纯 Python 脚本项目。
 
+Python 3.10+（`ruff.toml` 目标版本为 py312）。
+
 ## 依赖安装
 
 ```bash
