@@ -55,7 +55,7 @@ from constants import RES_DIR, CONFIG_PATH
 from theme_manager import theme_manager, Theme
 from error_handler import show_error
 from utils import open_dir
-from tab_base import _ClickableLabel, _DropLineEdit  # noqa: F401  再导出，保测试引用路径
+from tab_base import _ClickableLabel  # noqa: F401  再导出，保测试引用路径
 from tab_txt2epub import TabTxt2Epub
 from tab_epub2txt import TabEpub2Txt
 from tab_mobi2txt import TabMobi2Txt
@@ -126,7 +126,6 @@ class MainWindow(QMainWindow):
             save_config=lambda: self._save_config(),
             show_status=lambda msg: self.statusBar().showMessage(msg),
             confirm_output_path=lambda *a, **k: self._confirm_output_path(*a, **k),
-            initial_regex=self._config.chapter_regex,
         )
         self._tabs.addTab(self._tab_txt2epub, 'TXT → EPUB')
         self._tab_epub2txt = TabEpub2Txt(
@@ -642,9 +641,6 @@ class MainWindow(QMainWindow):
         idx = t2._cb_sep.findText(cfg.chapter_sep)
         if idx >= 0:
             t2._cb_sep.setCurrentIndex(idx)
-        # 正则
-        t1._te_reg.setText(
-            cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # 繁简
         t2._chb_fanjian.setChecked(cfg.fanjian_enabled)
         # 窗口几何尺寸
@@ -658,11 +654,15 @@ class MainWindow(QMainWindow):
             theme = Theme.DARK if cfg.theme == 'dark' else Theme.LIGHT
             self._theme_manager.set_theme(theme)
             self._theme_btn.setIcon(self._create_theme_icon(cfg.theme))
-        # 正则预设
+        # 正则预设（setCurrentIndex 会经 _on_regex_preset_changed 连带
+        # 覆写 _te_reg，所以 chapter_regex 必须在预设之后恢复）
         if hasattr(cfg, 'regex_preset') and cfg.regex_preset:
             idx = t1._cb_regex_preset.findText(cfg.regex_preset)
             if idx >= 0:
                 t1._cb_regex_preset.setCurrentIndex(idx)
+        # 正则（以配置值收尾）
+        t1._te_reg.setText(
+            cfg.chapter_regex or DEFAULT_CHAPTER_REGEX)
         # EPUB样式
         if hasattr(cfg, 'epub_style') and cfg.epub_style:
             idx = t1._cb_epub_style.findText(cfg.epub_style)

@@ -173,3 +173,90 @@ def test_window_restore_invalid_value_falls_back(make_window, raw):
     win = make_window({'txt_encoding': raw})
     assert win._tab_txt2epub._cb_encode.currentIndex() == 0
     assert win._tab_txt2epub._cb_encode.currentText() == '自动检测'
+
+
+# ================================================================
+# 子项 4：全字段 round-trip（_save_config 持久化的每个字段）
+# ================================================================
+
+
+def test_window_full_config_roundtrip(make_window):
+    """第一窗把每个持久化字段改成非默认值 → save → 新窗构造 restore → 逐字段断言。
+
+    失败消息带字段名：Tab 控件改名/读写路径破坏时能立刻定位是哪个字段。
+    覆盖 _save_config 实际写入 AppConfig 的全部 11 个字段。
+    """
+    from theme_manager import Theme
+
+    win1 = make_window()
+    t1 = win1._tab_txt2epub
+    t2 = win1._tab_epub2txt
+
+    def rotate(combo, name):
+        """把下拉拨到非默认项（往返必须能恢复出非默认值才算有效覆盖）。"""
+        assert combo.count() > 1, f'{name}: 至少需要 2 个选项才能测非默认往返'
+        combo.setCurrentIndex((combo.currentIndex() + 1) % combo.count())
+
+    expected = {}
+    rotate(t1._cb_encode, 'txt_encoding')
+    expected['txt_encoding'] = t1._cb_encode.currentText()
+    rotate(t2._cb_out_code, 'out_encoding')
+    expected['out_encoding'] = t2._cb_out_code.currentText()
+    rotate(t2._cb_sep, 'chapter_sep')
+    expected['chapter_sep'] = t2._cb_sep.currentText()
+    rotate(t1._cb_regex_preset, 'regex_preset')
+    expected['regex_preset'] = t1._cb_regex_preset.currentText()
+    # 必须在 rotate regex_preset 之后设置：切预设会连带覆写 _te_reg
+    t1._te_reg.setText('§自定义正则§')
+    expected['chapter_regex'] = '§自定义正则§'
+    t2._chb_fanjian.setChecked(not t2._chb_fanjian.isChecked())
+    expected['fanjian_enabled'] = t2._chb_fanjian.isChecked()
+    rotate(t1._cb_epub_style, 'epub_style')
+    expected['epub_style'] = t1._cb_epub_style.currentText()
+    rotate(t1._cb_font, 'font_family')
+    expected['font_family'] = t1._cb_font.currentText()
+    rotate(t1._cb_toc_style, 'toc_style')
+    expected['toc_style'] = t1._cb_toc_style.currentText()
+    win1.resize(900, 650)
+
+    # theme 是全局单例：save 后把单例拨回原值，
+    # 新窗构造时只有 _restore_config 真正生效才会回到 new_theme
+    orig_theme = win1._theme_manager.get_current_theme()
+    new_theme = Theme.LIGHT if orig_theme == Theme.DARK else Theme.DARK
+    win1._theme_manager.set_theme(new_theme)
+    expected['theme'] = new_theme.value
+
+    win1._save_config()
+    win1._theme_manager.set_theme(orig_theme)
+
+    try:
+        win2 = make_window()
+        got = {
+            'txt_encoding': win2._tab_txt2epub._cb_encode.currentText(),
+            'out_encoding': win2._tab_epub2txt._cb_out_code.currentText(),
+            'chapter_sep': win2._tab_epub2txt._cb_sep.currentText(),
+            'chapter_regex': win2._tab_txt2epub._te_reg.text(),
+            'fanjian_enabled': win2._tab_epub2txt._chb_fanjian.isChecked(),
+            'regex_preset': win2._tab_txt2epub._cb_regex_preset.currentText(),
+            'epub_style': win2._tab_txt2epub._cb_epub_style.currentText(),
+            'font_family': win2._tab_txt2epub._cb_font.currentText(),
+            'toc_style': win2._tab_txt2epub._cb_toc_style.currentText(),
+            'theme': win2._theme_manager.get_current_theme().value,
+        }
+        for name, exp in expected.items():
+            assert got[name] == exp, (
+                f'{name}: 新窗恢复为 {got[name]!r}，期望 {exp!r}')
+
+        # window_geometry 单独断言：offscreen 平台 restoreGeometry 有
+        # frameMargins 换算偏差（纯 Qt 复现：save 900 → restore 798），
+        # save 侧字节精确往返 + restore 侧高度精确回环、宽度不走默认回退
+        saved = json.loads(
+            Path(wmod.CONFIG_PATH).read_text(encoding='utf-8'))
+        assert bytes.fromhex(saved['window_geometry']) == bytes(
+            win1.saveGeometry()), 'window_geometry: 持久化字节 != saveGeometry()'
+        assert win2.height() == 650, (
+            f'window_geometry: 高度恢复为 {win2.height()}，期望 650')
+        assert win2.width() != 800, (
+            'window_geometry: 宽度为默认 800，配置几何未生效')
+    finally:
+        win1._theme_manager.set_theme(orig_theme)

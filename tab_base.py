@@ -135,14 +135,6 @@ class BaseTab(QWidget):
 
     # ---- 子类重写：生命周期/行为钩子 ----
 
-    def get_config(self) -> dict:
-        """子类重写：返回本 Tab 需要持久化的配置。"""
-        return {}
-
-    def apply_config(self, cfg: dict) -> None:
-        """子类重写：从配置恢复 UI 状态。"""
-        pass
-
     def reset(self) -> None:
         """子类重写：重置本 Tab 全部输入控件。"""
         pass

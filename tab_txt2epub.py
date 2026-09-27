@@ -42,7 +42,6 @@ class TabTxt2Epub(BaseTab):
         save_config,
         show_status,
         confirm_output_path,
-        initial_regex: str = '',
         parent=None,
     ):
         super().__init__(run_worker, is_busy, save_config, show_status,
@@ -56,13 +55,13 @@ class TabTxt2Epub(BaseTab):
         self._detected_encoding = 'utf-8'          # chardet 检测到的输入编码
         self._detected_path: str | None = None     # 检测值对应的文件路径（懒检测缓存键）
 
-        self._setup_tab1(initial_regex)
+        self._setup_tab1()
 
     # ================================================================
     # UI 构建
     # ================================================================
 
-    def _setup_tab1(self, initial_regex: str):
+    def _setup_tab1(self):
         """
         构建 Tab 1 的 UI 控件。
 
@@ -159,8 +158,8 @@ class TabTxt2Epub(BaseTab):
         row2.addWidget(QLabel('章节正则:'))
         self._te_reg = QLineEdit()
         self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
-        self._te_reg.setText(
-            initial_regex or DEFAULT_CHAPTER_REGEX)
+        # 初始为默认正则；随后 _restore_config 会用 config 值覆写
+        self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         row2.addWidget(self._te_reg)
         gl.addLayout(row2)
 
