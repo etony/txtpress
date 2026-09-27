@@ -2,68 +2,56 @@
 """
 TxtPress — 电子书格式转换工具。主窗口，Tab 布局，绑定所有用户交互。
 
-这个文件是程序的"骨架"——负责所有 UI 控件的创建、布局和事件绑定。
-代码量最大，但逻辑清晰：分为 3 个 Tab，每个 Tab 有"设置"和"操作"两部分。
+这个文件是程序的"骨架"——负责窗口框架、Tab 装配、全局快捷键、
+拖放分发、后台线程调度与配置持久化。三个 Tab 的 UI 构建与槽函数
+分别在 tab_txt2epub / tab_epub2txt / tab_mobi2txt 模块中。
 
 架构设计：
   MainWindow (QMainWindow)
     ├── QTabWidget
-    │   ├── Tab 0: TXT → EPUB  (生成电子书)
-    │   ├── Tab 1: EPUB → TXT  (提取文本)
-    │   └── Tab 2: MOBI → TXT  (额外的格式支持)
+    │   ├── Tab 0: TXT → EPUB  (生成电子书)  → tab_txt2epub.TabTxt2Epub
+    │   ├── Tab 1: EPUB → TXT  (提取文本)    → tab_epub2txt.TabEpub2Txt
+    │   └── Tab 2: MOBI → TXT  (额外的格式支持) → tab_mobi2txt.TabMobi2Txt
     └── 状态栏（QStatusBar）
         ├── 进度条（QProgressBar，默认隐藏）
         └── 取消按钮（默认隐藏）
 
 交互模式：
-  1. 用户填写/选择文件 → 点击转换 → 创建业务对象（Txt2Epub 等）
-  2. 通过 _run_worker 在后台线程执行耗时操作
+  1. 用户在 Tab 中填写/选择文件 → 点击转换
+  2. Tab 通过注入的 run_worker 回调 → MainWindow._run_worker 后台执行
   3. 转换过程中通过信号实时更新进度条和状态栏
   4. 完成后弹窗询问是否打开输出目录
 
 文件结构：
-  1. 辅助控件（_ClickableLabel, _DropLineEdit）
-  2. MainWindow 主体
-     - __init__:      窗口初始化、状态变量、进度条
-     - _setup_tab1:   TXT → EPUB 的 UI 控件
-     - _setup_tab2:   EPUB → TXT 的 UI 控件
-     - _setup_tab3:   MOBI → TXT 的 UI 控件
-     - 快捷键 & 拖放
-     - 槽函数（每个按钮的点击逻辑）
+  1. MainWindow 主体
+     - __init__:      窗口初始化、Tab 装配、进度条、主题
+     - 快捷键 & 拖放（分发到当前 Tab 的 convert/open_file/reset/load_file）
      - _run_worker:   后台线程管理
-     - 辅助方法：配置保存/恢复、打开目录等
+     - _confirm_output_path / _ask_open_dir: 输出确认与目录打开
+     - 配置持久化:    _save_config / _restore_config
 """
 
 from __future__ import annotations
 
 import math
 import os
-import sys
-import subprocess
-import datetime
 
 from loguru import logger
-import chardet
 
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QTabWidget, QGroupBox, QLabel, QLineEdit, QComboBox,
-    QPushButton, QCheckBox, QProgressBar,
-    QFileDialog, QMessageBox, QApplication,
+    QMainWindow, QWidget, QVBoxLayout,
+    QTabWidget, QGroupBox,
+    QPushButton, QProgressBar,
+    QMessageBox, QApplication,
 )
-from PyQt6.QtGui import QIcon, QPixmap, QImage, QPainter, QColor, QPen, QBrush
-from pathlib import Path
-from opencc import OpenCC
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QPen, QBrush
 
-from models import AppConfig, BookInfo
-from services import (
-    Txt2Epub, Epub2Txt, Epub2Mobi, convert_mobi_to_txt,
-    DEFAULT_CHAPTER_REGEX, validate_chapter_regex,
-)
+from models import AppConfig
+from services import DEFAULT_CHAPTER_REGEX
 from worker import ProgressWorker
-from dialogs import ChapterDialog, AboutDialog
-from constants import RES_DIR, CONFIG_PATH, DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS, FONT_PRESETS, TOC_STYLES
+from dialogs import AboutDialog
+from constants import RES_DIR, CONFIG_PATH
 from theme_manager import theme_manager, Theme
 from error_handler import show_error
 from utils import open_dir
