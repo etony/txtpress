@@ -46,6 +46,25 @@ class BookInfo:
 
 
 @dataclass
+class ConvertOptions:
+    """Txt2Epub.convert() 的参数集合。字段名与 dataclass 对齐。"""
+    text_path: str = ''
+    out_path: str = ''
+    title: str = ''
+    author: str = ''
+    language: str = 'cn'
+    publisher: str = ''
+    description: str = ''
+    cover_path: str = ''
+    css_style: str = ''
+    encoding: str = 'utf-8'
+    separator: str = ''
+    regex: str = ''
+    fanjian: bool = False
+    chapter_order: list | None = None
+
+
+@dataclass
 class AppConfig:
     """
     用户偏好配置，通过 config.json 持久化。

@@ -28,6 +28,7 @@ import re
 import uuid
 import datetime
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -122,6 +123,14 @@ def validate_chapter_regex(pattern: str) -> re.Pattern:
 # Txt2Epub — TXT → EPUB
 # =====================================================================
 
+# ConvertOptions 字段名 → Txt2Epub 属性名（仅名字不同的显式映射，
+# 其余字段同名直写；无对应属性的字段在 configure 中响亮报错）
+_OPTS_ATTR_MAP = {
+    'text_path': 'txt_path',
+    'out_path': 'epub_path',
+}
+
+
 class Txt2Epub:
     """
     TXT 文本 → EPUB 电子书转换器。
@@ -170,6 +179,26 @@ class Txt2Epub:
         self._cached_encoding: str = ''                           # 上次解析时的编码（用于缓存失效）
         self._cached_regex: str = ''                              # 上次解析时的正则（用于缓存失效）
         self._chapter_order: Optional[list[tuple[int, str]]] = None   # 自定义章节顺序 [(原始索引, 新标题)]
+
+    def configure(self, opts) -> None:
+        """按 ConvertOptions 批量设置属性。
+
+        空字符串/None/False 视为"未指定"，跳过不覆盖现有值；
+        chapter_order 为 None 同样跳过（保持当前顺序）。
+        未知字段（Txt2Epub 无对应属性）抛 AttributeError，
+        避免拼写错误被静默吞掉。
+        """
+        for key, value in asdict(opts).items():
+            if key == 'chapter_order':
+                if value is not None:
+                    self._chapter_order = value
+                continue
+            if not value:  # ''/None/False 均视为未指定
+                continue
+            attr = _OPTS_ATTR_MAP.get(key, key)
+            if not hasattr(self, attr):
+                raise AttributeError(f'Txt2Epub 没有属性 {key}')
+            setattr(self, attr, value)
 
     def load_css_from_file(self, css_path: str):
         """从文件加载自定义CSS样式"""

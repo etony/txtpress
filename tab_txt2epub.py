@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 from services import (
     Txt2Epub, Epub2Mobi, DEFAULT_CHAPTER_REGEX, validate_chapter_regex,
 )
+from models import ConvertOptions
 from dialogs import ChapterDialog
 from constants import DEFAULT_DESC, STYLES_DIR, REGEX_PRESETS, FONT_PRESETS, TOC_STYLES
 from error_handler import show_error
@@ -456,22 +457,6 @@ class TabTxt2Epub(BaseTab):
         self.save_config()
 
         conv = Txt2Epub(txt, epub)
-        # 只把用户填了值的字段传给转换器
-        if self._le_title.text().strip():
-            conv.title = self._le_title.text().strip()
-        if self._le_author.text().strip():
-            conv.author = self._le_author.text().strip()
-        if self._le_txt_contrib.text().strip():
-            conv.contributor = self._le_txt_contrib.text().strip()
-        if self._le_txt_date.text().strip():
-            conv.date = self._le_txt_date.text().strip()
-        if self._le_txt_desc.text().strip():
-            conv.description = self._le_txt_desc.text().strip()
-        if self._txt_cover:
-            conv.cover_path = self._txt_cover
-        conv.encoding = self._current_txt_encoding()
-        if len(reg) >= _MIN_REGEX_LEN:
-            conv.regex = reg
         # 章节顺序与来源指纹绑定：换文件/改正则/改编码后旧索引会错配到
         # 别的章节（索引通常仍合法，补尾救不了），直接丢弃本次顺序
         order = self._ordered_chapters
@@ -479,7 +464,21 @@ class TabTxt2Epub(BaseTab):
             order = None
             self.show_status('章节顺序因输入变化已失效，按原序转换')
             logger.info('章节顺序因输入变化已失效，按原序转换')
-        conv.set_chapter_order(order)
+        # 空字段由 configure 跳过，保持转换器默认值
+        conv.configure(ConvertOptions(
+            title=self._le_title.text().strip(),
+            author=self._le_author.text().strip(),
+            description=self._le_txt_desc.text().strip(),
+            cover_path=self._txt_cover,
+            encoding=self._current_txt_encoding(),
+            regex=reg if len(reg) >= _MIN_REGEX_LEN else '',
+            chapter_order=order,
+        ))
+        # ConvertOptions 未覆盖的字段（贡献者/日期）仍直接赋值
+        if self._le_txt_contrib.text().strip():
+            conv.contributor = self._le_txt_contrib.text().strip()
+        if self._le_txt_date.text().strip():
+            conv.date = self._le_txt_date.text().strip()
 
         # 加载EPUB样式
         style_name = self._cb_epub_style.currentText()
