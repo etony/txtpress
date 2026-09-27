@@ -139,27 +139,27 @@ def test_reset_tab2_restores_all_fields(main_window, tmp_path):
 def test_reset_tab3_restores_all_fields(main_window, tmp_path):
     """tab3 重置：输入/只读元数据字段清空，封面恢复默认图（断言表）。"""
     win = main_window
-    win._le_mobi.setText(str(tmp_path / 'a.mobi'))
-    win._le_mobi_txt.setText(str(tmp_path / 'a.txt'))
-    win._mobi_book_title.setText('题')
-    win._mobi_book_author.setText('者')
-    win._mobi_book_publisher.setText('社')
-    win._mobi_book_isbn.setText('isbn')
-    win._mobi_book_language.setText('zh')
-    win._mobi_book_published.setText('2022')
-    win._mobi_lbl_cover.setText('无封面')  # 模拟加载后的文字状态
+    win._tab_mobi2txt._le_mobi.setText(str(tmp_path / 'a.mobi'))
+    win._tab_mobi2txt._le_mobi_txt.setText(str(tmp_path / 'a.txt'))
+    win._tab_mobi2txt._mobi_book_title.setText('题')
+    win._tab_mobi2txt._mobi_book_author.setText('者')
+    win._tab_mobi2txt._mobi_book_publisher.setText('社')
+    win._tab_mobi2txt._mobi_book_isbn.setText('isbn')
+    win._tab_mobi2txt._mobi_book_language.setText('zh')
+    win._tab_mobi2txt._mobi_book_published.setText('2022')
+    win._tab_mobi2txt._mobi_lbl_cover.setText('无封面')  # 模拟加载后的文字状态
 
-    win._on_reset_tab3()
+    win._tab_mobi2txt._on_reset_tab3()
 
     # ---- 断言表 ----
-    for widget in (win._le_mobi, win._le_mobi_txt, win._mobi_book_title,
-                   win._mobi_book_author, win._mobi_book_publisher,
-                   win._mobi_book_isbn, win._mobi_book_language,
-                   win._mobi_book_published):
+    for widget in (win._tab_mobi2txt._le_mobi, win._tab_mobi2txt._le_mobi_txt, win._tab_mobi2txt._mobi_book_title,
+                   win._tab_mobi2txt._mobi_book_author, win._tab_mobi2txt._mobi_book_publisher,
+                   win._tab_mobi2txt._mobi_book_isbn, win._tab_mobi2txt._mobi_book_language,
+                   win._tab_mobi2txt._mobi_book_published):
         assert widget.text() == ''
-    assert win._mobi_lbl_cover.text() == ''
-    assert win._mobi_lbl_cover.pixmap() is not None
-    assert not win._mobi_lbl_cover.pixmap().isNull()
+    assert win._tab_mobi2txt._mobi_lbl_cover.text() == ''
+    assert win._tab_mobi2txt._mobi_lbl_cover.pixmap() is not None
+    assert not win._tab_mobi2txt._mobi_lbl_cover.pixmap().isNull()
     assert win.statusBar().currentMessage() == '已重置'
 
 
@@ -284,12 +284,12 @@ def test_tab3_rejects_missing_output_dir(main_window, tmp_path):
     win = main_window
     mobi = tmp_path / 'a.mobi'
     mobi.write_bytes(b'x')
-    win._le_mobi.setText(str(mobi))
-    win._le_mobi_txt.setText(str(tmp_path / 'no_such_dir' / 'out.txt'))
+    win._tab_mobi2txt._le_mobi.setText(str(mobi))
+    win._tab_mobi2txt._le_mobi_txt.setText(str(tmp_path / 'no_such_dir' / 'out.txt'))
 
     with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_mobi_to_txt()
+        win._tab_mobi2txt._on_convert_mobi_to_txt()
 
     warn.assert_called_once()
     assert '输出目录不存在' in warn.call_args.args[2]
@@ -301,12 +301,12 @@ def test_tab3_rejects_output_equal_to_input(main_window, tmp_path):
     win = main_window
     mobi = tmp_path / 'a.mobi'
     mobi.write_bytes(b'x')
-    win._le_mobi.setText(str(mobi))
-    win._le_mobi_txt.setText(str(mobi))
+    win._tab_mobi2txt._le_mobi.setText(str(mobi))
+    win._tab_mobi2txt._le_mobi_txt.setText(str(mobi))
 
     with mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_mobi_to_txt()
+        win._tab_mobi2txt._on_convert_mobi_to_txt()
 
     warn.assert_called_once()
     assert '输出路径不能与输入文件相同' in warn.call_args.args[2]
@@ -318,13 +318,13 @@ def test_tab3_allows_clean_output_path(main_window, tmp_path):
     win = main_window
     mobi = tmp_path / 'a.mobi'
     mobi.write_bytes(b'x')
-    win._le_mobi.setText(str(mobi))
-    win._le_mobi_txt.setText(str(tmp_path / 'out.txt'))
+    win._tab_mobi2txt._le_mobi.setText(str(mobi))
+    win._tab_mobi2txt._le_mobi_txt.setText(str(tmp_path / 'out.txt'))
 
     with mock.patch.object(wmod.QMessageBox, 'question') as question, \
             mock.patch.object(wmod.QMessageBox, 'warning') as warn, \
             mock.patch.object(win, '_run_worker') as run:
-        win._on_convert_mobi_to_txt()
+        win._tab_mobi2txt._on_convert_mobi_to_txt()
 
     question.assert_not_called()
     warn.assert_not_called()

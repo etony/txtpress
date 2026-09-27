@@ -514,7 +514,7 @@ def test_run_worker_call_sites_error_codes(main_window, monkeypatch,
     # 4. _load_mobi_metadata → mobi_read_failed
     crit = _run_to_failure(
         main_window,
-        lambda: main_window._load_mobi_metadata(str(tmp_path / 'x.mobi')))
+        lambda: main_window._tab_mobi2txt._load_mobi_metadata(str(tmp_path / 'x.mobi')))
     assert '无法读取MOBI文件' in crit.call_args.args[2]
 
 
