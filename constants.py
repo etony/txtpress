@@ -18,6 +18,9 @@ CONFIG_PATH = os.path.join(BASE_DIR, 'config.json')
 DEFAULT_COVER = os.path.join(RES_DIR, 'cover.jpeg')
 STYLES_DIR = os.path.join(BASE_DIR, 'styles')
 
+# 书籍封面展示尺寸 (宽, 高)，三个 Tab 统一
+COVER_SIZE = (120, 168)
+
 # ---- 默认值常量 ----
 # 当用户未填写时使用的默认值
 DEFAULT_AUTHOR = 'etony.an@gmail.com'

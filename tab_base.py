@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QWidget,
 )
 
-from constants import RES_DIR
+from constants import RES_DIR, COVER_SIZE
 
 
 # =====================================================================
@@ -181,7 +181,7 @@ class BaseTab(QWidget):
         gl.setSpacing(10)
 
         # 封面图片（左侧）
-        cover_label.setFixedSize(120, 168)
+        cover_label.setFixedSize(*COVER_SIZE)
         pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
         cover_label.setPixmap(pixmap)
         cover_label.clicked.connect(cover_clicked)

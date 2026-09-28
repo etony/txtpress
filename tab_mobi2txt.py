@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from services import convert_mobi_to_txt
-from constants import RES_DIR
+from constants import RES_DIR, COVER_SIZE
 from tab_base import BaseTab
 
 
@@ -77,12 +77,10 @@ class TabMobi2Txt(BaseTab):
 
         # 封面图片
         self._mobi_lbl_cover = QLabel()
-        self._mobi_lbl_cover.setFixedSize(120, 168)
-        pixmap = QPixmap(os.path.join(RES_DIR, 'cover.jpeg'))
-        self._mobi_lbl_cover.setPixmap(pixmap)
-        self._mobi_lbl_cover.setStyleSheet('border: 1px solid #ccc;')
+        self._mobi_lbl_cover.setObjectName('cover_label')  # 复用 QSS 封面样式（含深色主题）
+        self._mobi_lbl_cover.setFixedSize(*COVER_SIZE)
+        self._set_mobi_cover(QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._mobi_lbl_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._mobi_lbl_cover.setScaledContents(True)
         gl.addWidget(self._mobi_lbl_cover)
 
         # 信息字段
@@ -120,7 +118,7 @@ class TabMobi2Txt(BaseTab):
         info_layout.addWidget(self._mobi_book_published, 2, 3)
 
         # 刷新按钮
-        btn_refresh = QPushButton('🔄 刷新信息')
+        btn_refresh = QPushButton('刷新信息')
         btn_refresh.setToolTip('重新提取 MOBI 文件的书籍信息')
         btn_refresh.clicked.connect(self._on_refresh_mobi_info)
         info_layout.addWidget(btn_refresh, 3, 0, 1, 4)
@@ -133,7 +131,7 @@ class TabMobi2Txt(BaseTab):
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
 
-        btn = QPushButton('▶ 转换为 TXT')
+        btn = QPushButton('转换为 TXT')
         btn.setObjectName('btn_action')
         btn.setToolTip('将 MOBI 文件转换为 TXT')
         btn.clicked.connect(self._on_convert_mobi_to_txt)
@@ -141,7 +139,7 @@ class TabMobi2Txt(BaseTab):
 
         gl.addStretch()
 
-        btn = QPushButton('↺ 重置')
+        btn = QPushButton('重置')
         btn.setObjectName('btn_reset')
         btn.setToolTip('(Ctrl+R)')
         btn.clicked.connect(self._on_reset_tab3)
@@ -236,9 +234,7 @@ class TabMobi2Txt(BaseTab):
             if cover_data:
                 pixmap = QPixmap()
                 if pixmap.loadFromData(cover_data):
-                    self._mobi_lbl_cover.setPixmap(pixmap.scaled(
-                        120, 160, Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation))
+                    self._set_mobi_cover(pixmap)
                 else:
                     self._mobi_lbl_cover.setText('封面加载失败')
             else:
@@ -247,6 +243,12 @@ class TabMobi2Txt(BaseTab):
         self.run_worker(target=_read, on_success=_fill,
                         fail_msg='读取 MOBI 失败', show_progress=False,
                         error_code='mobi_read_failed')
+
+    def _set_mobi_cover(self, pixmap: QPixmap) -> None:
+        """等比例缩放封面到 COVER_SIZE 并显示（避免 setScaledContents 拉伸变形）。"""
+        self._mobi_lbl_cover.setPixmap(pixmap.scaled(
+            *COVER_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation))
 
     def _on_refresh_mobi_info(self):
         """手动刷新 MOBI 文件的书籍信息"""
@@ -296,6 +298,6 @@ class TabMobi2Txt(BaseTab):
                   self._mobi_book_isbn, self._mobi_book_language,
                   self._mobi_book_published):
             w.clear()
-        # 恢复默认封面图（与初始状态一致，setPixmap 会清掉"无封面"等文字）
-        self._reset_cover(self._mobi_lbl_cover)
+        # 恢复默认封面图（等比例缩放，与初始状态一致，setPixmap 会清掉"无封面"等文字）
+        self._set_mobi_cover(QPixmap(os.path.join(RES_DIR, 'cover.jpeg')))
         self._reset_status('tab3')

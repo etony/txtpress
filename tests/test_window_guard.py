@@ -272,13 +272,13 @@ def test_done_skips_on_success_on_failure(main_window, monkeypatch):
 
 
 def test_show_progress_false_keeps_controls_hidden(main_window, monkeypatch):
-    """show_progress=False：进度条与取消按钮保持隐藏，tabs 仍被禁用。"""
+    """show_progress=False：进度条与取消按钮隐藏，且不禁用 tabs（快速读取任务）。"""
     monkeypatch.setattr(wmod, 'ProgressWorker', _FakeWorker)
     main_window._run_worker(lambda p, s: None, show_progress=False)
 
     assert main_window._progress_bar.isHidden() is True
     assert main_window._cancel_btn.isHidden() is True
-    assert main_window._tabs.isEnabled() is False
+    assert main_window._tabs.isEnabled() is True  # 元数据读取不禁用标签页
     assert main_window._is_busy() is True
 
 

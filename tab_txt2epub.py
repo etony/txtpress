@@ -115,7 +115,7 @@ class TabTxt2Epub(BaseTab):
                 {'label': '书名:', 'widget': self._le_title, 'row': 0, 'col': 0,
                  'placeholder': '默认 = 文件名'},
                 {'label': '作者:', 'widget': self._le_author, 'row': 0, 'col': 2,
-                 'placeholder': '默认 = 作者'},
+                 'placeholder': '作者（可选，默认 etony.an@gmail.com）'},
                 {'label': '贡献者:', 'widget': self._le_txt_contrib, 'row': 1, 'col': 0,
                  'placeholder': '默认 etony.an@gmail.com'},
                 {'label': '日期:', 'widget': self._le_txt_date, 'row': 1, 'col': 2,
@@ -186,7 +186,7 @@ class TabTxt2Epub(BaseTab):
         gl = QHBoxLayout(grp)
         gl.setSpacing(10)
 
-        btn = QPushButton('▶ 开始转换')
+        btn = QPushButton('开始转换')
         btn.setObjectName('btn_action')
         btn.setToolTip('将 TXT 转换为 EPUB（Ctrl+Enter）')
         btn.clicked.connect(self._on_convert_tab1)
@@ -194,19 +194,20 @@ class TabTxt2Epub(BaseTab):
 
         btn = QPushButton('→MOBI')
         btn.setObjectName('btn_info')
-        btn.setToolTip('将 EPUB 转换为 MOBI（需要 Calibre）')
+        btn.setEnabled(False)  # 框架接口，需 Calibre 待实现，置灰避免误点
+        btn.setToolTip('将 EPUB 转换为 MOBI（需 Calibre，待实现）')
         btn.clicked.connect(self._on_convert_mobi)
         gl.addWidget(btn)
 
         gl.addStretch()
 
-        btn = QPushButton('📑 目录预览')
+        btn = QPushButton('目录预览')
         btn.setToolTip('预览 TXT 文件中的章节列表')
         btn.setObjectName('btn_secondary')
         btn.clicked.connect(self._on_preview_chapters)
         gl.addWidget(btn)
 
-        btn = QPushButton('↺ 重置')
+        btn = QPushButton('重置')
         btn.setObjectName('btn_reset')
         btn.setToolTip('清空所有输入 (Ctrl+R)')
         btn.clicked.connect(self._on_reset_tab1)
@@ -286,10 +287,10 @@ class TabTxt2Epub(BaseTab):
         self._txt_dir, fname = os.path.split(path)
         base, _ = os.path.splitext(fname)
 
-        # 自动填充：书名/作者用文件名，EPUB 输出路径与 TXT 同目录
+        # 自动填充：书名用文件名，EPUB 输出路径与 TXT 同目录；
+        # 作者从文件名推不出来，留空走转换器默认值
         self._le_epub.setText(os.path.join(self._txt_dir, base + '.epub'))
         self._le_title.setText(base.strip())
-        self._le_author.setText(base.strip())
         self._le_txt_desc.setText(DEFAULT_DESC)
 
         # 编码检测——读取文件前 4096 字节自动判断编码

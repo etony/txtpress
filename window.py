@@ -45,7 +45,9 @@ from PyQt6.QtWidgets import (
     QPushButton, QProgressBar,
     QMessageBox, QApplication,
 )
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QPen, QBrush
+from PyQt6.QtGui import (
+    QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QAction,
+)
 
 from models import AppConfig
 from services import DEFAULT_CHAPTER_REGEX
@@ -102,7 +104,7 @@ class MainWindow(QMainWindow):
         # ---- 窗口基础 ----
         self.setWindowTitle('TxtPress — 电子书格式转换工具')
         self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
-        self.setMinimumSize(780, 440)
+        self.setMinimumSize(860, 500)
 
         # ---- 中央控件 ----
         # 整个窗口分为：Tab 标签页 + 底部状态栏
@@ -177,6 +179,9 @@ class MainWindow(QMainWindow):
         # ---- 快捷键 ----
         self._setup_shortcuts()
 
+        # ---- 菜单栏 ----
+        self._setup_menu()
+
         # ---- 加载配置（恢复上次设置）----
         self._restore_config()
 
@@ -214,6 +219,14 @@ class MainWindow(QMainWindow):
             self._on_shortcut_reset)
         QShortcut(QKeySequence('F1'), self).activated.connect(
             self._on_about)
+
+    def _setup_menu(self):
+        """构建菜单栏：帮助 → 关于（补充 F1 之外的可见入口）。"""
+        menu = self.menuBar().addMenu('帮助(&H)')
+        act_about = QAction('关于 TxtPress(&A)', self)
+        act_about.setShortcut('F1')
+        act_about.triggered.connect(self._on_about)
+        menu.addAction(act_about)
 
     # ================================================================
     # Drag & Drop（窗口级 + 行级）
@@ -466,7 +479,9 @@ class MainWindow(QMainWindow):
             self._cancel_btn.setVisible(True)
             self._cancel_btn.setEnabled(True)
             self._cancel_btn.setText('取消')
-        self._tabs.setEnabled(False)  # 禁用标签页，防止用户重复点击
+            # 转换任务禁用标签页防止重复操作；
+            # 元数据读取等快速任务不禁用（is_busy 已挡住并发）
+            self._tabs.setEnabled(False)
         self._worker.start()
 
     def _on_cancel_clicked(self):
