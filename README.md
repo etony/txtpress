@@ -14,10 +14,10 @@
 | MOBI 元信息提取 | 自动提取 MOBI 文件的标题、作者、出版商、ISBN、语言、出版日期 |
 | 章节排序 | 目录预览对话框中拖拽调整章节顺序 |
 | 繁→简转换 | 导出 TXT 时自动转换繁体中文 |
-| 拖放支持 | 从文件管理器拖入 .txt / .epub / .mobi 自动切换对应页面并加载 |
+| 拖放支持 | 从文件管理器拖入 .txt / .epub / .mobi 自动切换对应页面并加载（转换进行中屏蔽） |
 | 快捷键 | Ctrl+Enter 转换、Ctrl+O 打开、Ctrl+R 重置、F1 关于 |
 | 主题切换 | 深色/浅色主题切换，状态栏太阳/月亮图标 |
-| 章节正则预设 | 4 种常用正则预设 + 自定义输入 |
+| 章节正则预设 | 4 种常用正则预设 + 自定义输入（须恰好 1 个捕获组，转换前校验） |
 | EPUB 样式选择 | 3 种内置样式（default/minimal/modern） |
 | EPUB 字体选择 | 8 种内置正文字体预设（宋体/黑体/微软雅黑/思源系列/霞鹜文楷等） |
 | 目录样式 | 5 种目录符号样式（默认/圆点/圆圈/无标记/数字） |
@@ -155,7 +155,7 @@ txtpress/
 
 所有转换方法接受可选 `progress(current, total)` 和 `status(message)` 回调，通过 `worker.py` 实现实时进度报告。
 
-`Txt2Epub` 支持 `load_css_from_file()` 方法加载自定义 EPUB 样式，`configure(opts)` 按 `ConvertOptions` 批量设置转换参数。
+`Txt2Epub` 支持 `load_css_from_file()` 方法加载自定义 EPUB 样式，`apply_text_style()` 在 CSS 末尾追加正文字体与目录样式覆盖规则（对 default/minimal/modern 全部生效），`configure(opts)` 按 `ConvertOptions` 批量设置转换参数。
 
 ### models.py — 数据模型
 
