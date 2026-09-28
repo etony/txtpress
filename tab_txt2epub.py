@@ -121,7 +121,7 @@ class TabTxt2Epub(BaseTab):
                 {'label': '日期:', 'widget': self._le_txt_date, 'row': 1, 'col': 2,
                  'placeholder': '默认当前时间 (yyyy-mm-dd)'},
                 {'label': '描述:', 'widget': self._le_txt_desc, 'row': 2, 'col': 0,
-                 'span': (1, 3), 'placeholder': 'EPUB 描述信息 (dc:description，可选)'},
+                 'span': (1, 3), 'placeholder': '素材来源于网络,版权归原作者 (dc:description，可选)'},
             ],
         )
         layout.addWidget(grp)
