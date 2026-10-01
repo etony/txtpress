@@ -175,9 +175,10 @@ QPushButton#btn_browse {
     padding: 4px 10px;
     font-size: 11px;
 }
-/* 主操作按钮：唯一强调色（蓝底白字），与其余中性灰按钮拉开层级 */
+/* 主操作按钮：唯一强调色（柔和蓝底白字），比深蓝 #1976D2 更淡，
+   在浅色主题下不至于过于突兀，与其余中性灰按钮仍拉开层级 */
 QPushButton#btn_action {
-    background-color: #1976D2;
+    background-color: #4A90D9;
     color: #FFFFFF;
     border: none;
     padding: 8px 22px;
@@ -186,15 +187,15 @@ QPushButton#btn_action {
     border-radius: 6px;
 }
 QPushButton#btn_action:hover {
-    background-color: #1565C0;
+    background-color: #3D80C4;
     color: #FFFFFF;
 }
 QPushButton#btn_action:pressed {
-    background-color: #0D47A1;
+    background-color: #2F6BA8;
     color: #FFFFFF;
 }
 QPushButton#btn_action:disabled {
-    background-color: #BBDEFB;
+    background-color: #C7DDF3;
     color: #FFFFFF;
 }
 QPushButton#btn_reset {
