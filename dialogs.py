@@ -22,9 +22,10 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QPushButton, QLabel,
     QHBoxLayout, QAbstractItemView,
 )
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPixmap
 
 from constants import RES_DIR
+from theme_manager import theme_manager, Theme
 
 
 class ChapterDialog(QDialog):
@@ -135,26 +136,40 @@ class ChapterDialog(QDialog):
 
 
 class AboutDialog(QDialog):
-    """关于弹窗 — 显示版本、技术栈、作者信息。
+    """关于弹窗 — 显示 Logo、版本、技术栈、作者信息。
 
-    setFixedSize(360, 200) 让对话框不可缩放。
-    内容简单固定，不需要用户交互或调整大小。
+    setFixedSize 让对话框不可缩放（内容简单固定，无需交互调整）。
+    颜色随当前主题切换（浅/深），避免硬编码 #1976D2 在深色下突兀。
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle('关于 TxtPress')
         self.setWindowIcon(QIcon(os.path.join(RES_DIR, 'bookinfo.ico')))
-        self.setFixedSize(360, 200)  # 固定大小，不让用户拉伸
+        self.setFixedSize(380, 260)  # 固定大小，不让用户拉伸
+
+        dark = (theme_manager.get_current_theme() == Theme.DARK)
+        accent = '#4A9EFF' if dark else '#1976D2'
+        muted = '#AAAAAA' if dark else '#757575'
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        # Logo（图标放大渲染，缺失时显示程序图标本身）
+        logo = QLabel()
+        logo.setFixedSize(48, 48)
+        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_pix = QPixmap(os.path.join(RES_DIR, 'bookinfo.ico'))
+        if not logo_pix.isNull():
+            logo.setPixmap(logo_pix.scaled(
+                48, 48, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation))
+        layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # 程序名称标题
         title = QLabel('TxtPress')
-        title.setStyleSheet(
-            'font-size: 16px; font-weight: 600; color: #1976D2;'
-        )
+        title.setStyleSheet(f'font-size: 18px; font-weight: 600; color: {accent};')
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
@@ -162,14 +177,16 @@ class AboutDialog(QDialog):
         info = QLabel(
             '版本 2.0\n'
             '基于 PyQt6 + ebooklib + BeautifulSoup\n'
-            '支持 TXT↔EPUB↔MOBI\n'
+            '支持 TXT ↔ EPUB ↔ MOBI\n'
             '作者: etony.an@gmail.com'
         )
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info.setStyleSheet('color: #757575; font-size: 12px;')
+        info.setStyleSheet(f'color: {muted}; font-size: 12px;')
+        info.setContentsMargins(0, 0, 0, 8)
         layout.addWidget(info)
 
-        # 确定按钮
+        # 确定按钮（btn_action 强调样式）
         btn = QPushButton('确定')
+        btn.setObjectName('btn_action')
         btn.clicked.connect(self.accept)
         layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)

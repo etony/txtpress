@@ -154,6 +154,10 @@ class MainWindow(QMainWindow):
         self._progress_bar.setVisible(False)
         self._progress_bar.setFixedWidth(200)
         self._progress_bar.setFixedHeight(14)
+        # 显示"当前/总数"（%v=当前值 %m=最大值，均为活值，setRange/setValue 后自动刷新）
+        # 大文件转换时比孤立的百分比更能传达"还有多少没转完"
+        self._progress_bar.setTextVisible(True)
+        self._progress_bar.setFormat('%v/%m')
         self.statusBar().addPermanentWidget(self._progress_bar)
         self._cancel_btn = QPushButton('取消')
         self._cancel_btn.setObjectName('btn_reset')

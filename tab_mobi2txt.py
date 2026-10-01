@@ -133,7 +133,7 @@ class TabMobi2Txt(BaseTab):
 
         btn = QPushButton('转换为 TXT')
         btn.setObjectName('btn_action')
-        btn.setToolTip('将 MOBI 文件转换为 TXT')
+        btn.setToolTip('将 MOBI 文件转换为 TXT（Ctrl+Enter）')
         btn.clicked.connect(self._on_convert_mobi_to_txt)
         gl.addWidget(btn)
 

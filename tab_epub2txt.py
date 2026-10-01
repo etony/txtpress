@@ -150,7 +150,7 @@ class TabEpub2Txt(BaseTab):
 
         btn = QPushButton('合并转换')
         btn.setObjectName('btn_action')
-        btn.setToolTip('将 EPUB 所有章节合并为一个 TXT 文件')
+        btn.setToolTip('将 EPUB 所有章节合并为一个 TXT 文件（Ctrl+Enter）')
         btn.clicked.connect(self._on_convert_tab2)
         gl.addWidget(btn)
 

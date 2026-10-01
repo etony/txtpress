@@ -175,11 +175,27 @@ QPushButton#btn_browse {
     padding: 4px 10px;
     font-size: 11px;
 }
+/* 主操作按钮：唯一强调色（蓝底白字），与其余中性灰按钮拉开层级 */
 QPushButton#btn_action {
+    background-color: #1976D2;
+    color: #FFFFFF;
+    border: none;
     padding: 8px 22px;
     font-size: 13px;
     font-weight: 600;
     border-radius: 6px;
+}
+QPushButton#btn_action:hover {
+    background-color: #1565C0;
+    color: #FFFFFF;
+}
+QPushButton#btn_action:pressed {
+    background-color: #0D47A1;
+    color: #FFFFFF;
+}
+QPushButton#btn_action:disabled {
+    background-color: #BBDEFB;
+    color: #FFFFFF;
 }
 QPushButton#btn_reset {
     background-color: transparent;
@@ -261,6 +277,13 @@ QLabel {
 #cover_label:hover {
     background: #E3F2FD;
     border-color: #1976D2;
+}
+
+/* --- 编码检测提示标签 --- */
+#enc_detect {
+    color: #757575;
+    font-size: 11px;
+    background: transparent;
 }
 
 /* --- QDialog --- */

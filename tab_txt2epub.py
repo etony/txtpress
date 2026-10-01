@@ -8,8 +8,8 @@ from loguru import logger
 import chardet
 
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QVBoxLayout,
+    QComboBox, QFileDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+    QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
 )
 
 from services import (
@@ -127,58 +127,55 @@ class TabTxt2Epub(BaseTab):
         layout.addWidget(grp)
 
         # ---- 高级选项 ----
+        # 栅格布局：标签/控件成对、两列并排。相比原来的单行横排，
+        # 窄窗口（最小 780px）下下拉框不会被挤压截断，行高也统一。
         grp = QGroupBox('选项')
-        gl = QVBoxLayout(grp)
-        gl.setSpacing(10)
+        grid = QGridLayout(grp)
+        grid.setSpacing(10)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel('文件编码:'))
         self._cb_encode = QComboBox()
         self._cb_encode.addItems(
             ['自动检测', 'utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis'])
-        row.addWidget(self._cb_encode)
-        row.addSpacing(12)
+        grid.addWidget(QLabel('文件编码:'), 0, 0)
+        grid.addWidget(self._cb_encode, 0, 1)
+        # 编码检测提示：常驻显示 chardet 检测结果。
+        # 原来只写进状态栏（易失消息，点别的按钮就没了），无法回头核对。
+        self._enc_detect = QLabel()
+        self._enc_detect.setObjectName('enc_detect')
+        self._enc_detect.setToolTip('chardet 检测到的文件编码（仅供参考，可手动覆盖）')
+        grid.addWidget(self._enc_detect, 0, 2)
 
-        # EPUB样式
-        row.addWidget(QLabel('EPUB样式:'))
         self._cb_epub_style = QComboBox()
         self._load_epub_styles()
-        row.addWidget(self._cb_epub_style)
-        row.addSpacing(12)
+        grid.addWidget(QLabel('EPUB样式:'), 0, 3)
+        grid.addWidget(self._cb_epub_style, 0, 4)
 
-        # 章节正则预设
-        row.addWidget(QLabel('正则预设:'))
         self._cb_regex_preset = QComboBox()
         self._cb_regex_preset.addItems(list(REGEX_PRESETS.keys()))
         self._cb_regex_preset.currentTextChanged.connect(self._on_regex_preset_changed)
-        row.addWidget(self._cb_regex_preset)
-        row.addStretch()
-        gl.addLayout(row)
+        grid.addWidget(QLabel('正则预设:'), 1, 0)
+        grid.addWidget(self._cb_regex_preset, 1, 1)
 
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel('章节正则:'))
         self._te_reg = QLineEdit()
         self._te_reg.setPlaceholderText('自定义章节匹配正则…（留空使用默认正则）')
         # 初始为默认正则；随后 _restore_config 会用 config 值覆写
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
-        row2.addWidget(self._te_reg)
-        gl.addLayout(row2)
+        grid.addWidget(QLabel('章节正则:'), 1, 2)
+        grid.addWidget(self._te_reg, 1, 3, 1, 2)
 
-        # 字体和目录样式
-        row3 = QHBoxLayout()
-        row3.addWidget(QLabel('正文字体:'))
         self._cb_font = QComboBox()
         self._cb_font.addItems(list(FONT_PRESETS.keys()))
-        row3.addWidget(self._cb_font)
-        row3.addSpacing(12)
+        grid.addWidget(QLabel('正文字体:'), 2, 0)
+        grid.addWidget(self._cb_font, 2, 1)
 
-        row3.addWidget(QLabel('目录样式:'))
         self._cb_toc_style = QComboBox()
         self._cb_toc_style.addItems(list(TOC_STYLES.keys()))
-        row3.addWidget(self._cb_toc_style)
-        row3.addStretch()
-        gl.addLayout(row3)
+        grid.addWidget(QLabel('目录样式:'), 2, 2)
+        grid.addWidget(self._cb_toc_style, 2, 3)
 
+        # 控件列比标签列更宽
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(4, 1)
         layout.addWidget(grp)
 
         # ---- 操作 ----
@@ -192,7 +189,7 @@ class TabTxt2Epub(BaseTab):
         btn.clicked.connect(self._on_convert_tab1)
         gl.addWidget(btn)
 
-        btn = QPushButton('→MOBI')
+        btn = QPushButton('转为 MOBI')
         btn.setObjectName('btn_info')
         btn.setEnabled(False)  # 框架接口，需 Calibre 待实现，置灰避免误点
         btn.setToolTip('将 EPUB 转换为 MOBI（需 Calibre，待实现）')
@@ -298,6 +295,9 @@ class TabTxt2Epub(BaseTab):
         enc, lang = self._detect_encoding(path) or ('utf-8', '未知')
         self._detected_encoding = enc
         self._detected_path = path
+        # 检测结果写进常驻标签（状态栏是易失消息，点别的按钮就没了）
+        self._enc_detect.setText(f'检测: {enc}')
+        self._enc_detect.setToolTip(f'chardet 检测: {enc}（语言 {lang}）\n仅供参考，可在左侧手动指定编码')
         self.show_status(f'文件: {fname}  编码: {enc}')
         logger.info(f'文件检测: {fname} 编码={enc} 语言={lang}')
 
@@ -419,6 +419,8 @@ class TabTxt2Epub(BaseTab):
         self._cb_toc_style.setCurrentIndex(0)
         self._detected_encoding = 'utf-8'
         self._detected_path = None
+        self._enc_detect.clear()
+        self._enc_detect.setToolTip('chardet 检测到的文件编码（仅供参考，可手动覆盖）')
         self._te_reg.setText(DEFAULT_CHAPTER_REGEX)
         self._ordered_chapters = None
         self._ordered_chapters_src = None
